@@ -1,7 +1,7 @@
 #include <amoloader.h>
 
 int main() {
-    int i;
+    int i, j;
     amoloader_data* data = loadAMO("tests/cube.amo");
     if(data == NULL) {
         fprintf(stderr, "Couldn't load amo file\n");
@@ -36,11 +36,21 @@ int main() {
     }
     for(i = 0; i < data->animations_count; i++) {
         printf("animation: %s\n", data->animations[i].name);
-        printf("animated pos: time: %f joint: %s pos: %f %f %f\n", data->animations[i].keyframes_pos[0].timestamp,
-                                                                   data->animations[i].keyframes_pos[0].joint->name,
-                                                                   data->animations[i].keyframes_pos[0].pos[0],
-                                                                   data->animations[i].keyframes_pos[0].pos[1],
-                                                                   data->animations[i].keyframes_pos[0].pos[2]);
+        for(j = 0; j < data->animations[i].keyframes_pos_count; j++) {
+            printf("animated pos: time: %f joint: %s pos: %f %f %f\n", data->animations[i].keyframes_pos[j].timestamp,
+                                                                       data->animations[i].keyframes_pos[j].joint->name,
+                                                                       data->animations[i].keyframes_pos[j].pos[0],
+                                                                       data->animations[i].keyframes_pos[j].pos[1],
+                                                                       data->animations[i].keyframes_pos[j].pos[2]);
+        }
+        for(j = 0; j < data->animations[i].keyframes_rot_count; j++) {
+            printf("animated rot: time %f joint: %s rot: %f %f %f %f\n", data->animations[i].keyframes_rot[j].timestamp,
+                                                                         data->animations[i].keyframes_rot[j].joint->name,
+                                                                         data->animations[i].keyframes_rot[j].rot[0],
+                                                                         data->animations[i].keyframes_rot[j].rot[1],
+                                                                         data->animations[i].keyframes_rot[j].rot[2],
+                                                                         data->animations[i].keyframes_rot[j].rot[3]);
+        }
     }
     destroyAMO(data);
     return 0;
