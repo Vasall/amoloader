@@ -22,8 +22,8 @@ To include amoloader into your project:
 3. In your Makefile, add `-L. -lamoloader` to your compile instruction
 ___
 The library has only two functions:
-- `amoloader_data* loadAMO(const char* path)`
-- `int destroyAMO(amoloader_data* data)`  
+- `struct amoloader_data *load_amo_(const char *path)`
+- `int destroy_amo(struct amoloader_data *data)`
 
 The `amoloader_data` struct contains the parsed data (See [amoloader.h](amoloader.h) for more details)
 ### Example
@@ -31,14 +31,14 @@ The `amoloader_data` struct contains the parsed data (See [amoloader.h](amoloade
 #include "amoloader.h"
 
 int main() {
-    amoloader_data* data = loadAMO("path/to/amo_file.amo");
+    struct amoloader_data *data = load_amo("path/to/amo_file.amo");
 
     if(data == NULL) {
         fprintf(stderr, "Couldn't load amo file\n");
         return -1;
     }
 
-    destroyAMO(data);
+    destroy_amo(data);
     return 0;
 }
 ```

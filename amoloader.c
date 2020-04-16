@@ -1,8 +1,9 @@
 #include "amoloader.h"
 
-amoloader_data* loadAMO(const char* path) {
-    FILE* file;
-    amoloader_data* data;
+struct amoloader_data *load_amo(const char *path)
+{
+    FILE *file;
+    struct amoloader_data *data;
     char cmd_buf[256];
     int vertex_count = 0;
     int normal_count = 0;
@@ -19,7 +20,7 @@ amoloader_data* loadAMO(const char* path) {
     if(!file) {
         return NULL;
     }
-    data = calloc(sizeof(amoloader_data), 1);
+    data = calloc(sizeof(struct amoloader_data), 1);
     if(data == NULL) {
         fclose(file);
         return NULL;
@@ -94,7 +95,7 @@ amoloader_data* loadAMO(const char* path) {
         } else if(strcmp(cmd_buf, "j") == 0) {
             int parent_joint;
             data->joints_count++;
-            data->joints = realloc(data->joints, sizeof(amoloader_joint)*data->joints_count);
+            data->joints = realloc(data->joints, sizeof(struct amoloader_joint)*data->joints_count);
             fscanf(file, "%s %d", data->joints[data->joints_count-1].name, &parent_joint);
             /* Special treatment for root joint */
             if(parent_joint == -1) {
@@ -105,15 +106,15 @@ amoloader_data* loadAMO(const char* path) {
         /* a <name> */
         } else if(strcmp(cmd_buf, "a") == 0) {
             data->animations_count++;
-            data->animations = realloc(data->animations, sizeof(amoloader_animation)*data->animations_count);
+            data->animations = realloc(data->animations, sizeof(struct amoloader_animation)*data->animations_count);
             fscanf(file, "%s", data->animations[data->animations_count-1].name);
         /* ap <timestamp> <joint> <x> <y> <z> */
         } else if(strcmp(cmd_buf, "ap") == 0) {
-            amoloader_animation_keyframe_pos* keyframe;
+            struct amoloader_animation_keyframe_pos *keyframe;
             int joint;
-            amoloader_animation* animation = &data->animations[data->animations_count-1];
+            struct amoloader_animation *animation = &data->animations[data->animations_count-1];
             animation->keyframes_pos_count++;
-            animation->keyframes_pos = realloc(animation->keyframes_pos, sizeof(amoloader_animation_keyframe_pos)*animation->keyframes_pos_count);
+            animation->keyframes_pos = realloc(animation->keyframes_pos, sizeof(struct amoloader_animation_keyframe_pos)*animation->keyframes_pos_count);
             keyframe = &animation->keyframes_pos[animation->keyframes_pos_count-1];
             fscanf(file, "%f %d %f %f %f", &keyframe->timestamp, &joint, &keyframe->pos[0],
                                                                          &keyframe->pos[1],
@@ -121,11 +122,11 @@ amoloader_data* loadAMO(const char* path) {
             keyframe->joint = &data->joints[joint-1];
         /* ar <timestamp> <joint> <x> <y> <z> <w> */
         } else if(strcmp(cmd_buf, "ar") == 0) {
-            amoloader_animation_keyframe_rot* keyframe;
+            struct amoloader_animation_keyframe_rot *keyframe;
             int joint;
-            amoloader_animation* animation = &data->animations[data->animations_count-1];
+            struct amoloader_animation *animation = &data->animations[data->animations_count-1];
             animation->keyframes_rot_count++;
-            animation->keyframes_rot = realloc(animation->keyframes_rot, sizeof(amoloader_animation_keyframe_rot)*animation->keyframes_rot_count);
+            animation->keyframes_rot = realloc(animation->keyframes_rot, sizeof(struct amoloader_animation_keyframe_rot)*animation->keyframes_rot_count);
             keyframe = &animation->keyframes_rot[animation->keyframes_rot_count-1];
             fscanf(file, "%f %d %f %f %f %f", &keyframe->timestamp, &joint, &keyframe->rot[0],
                                                                             &keyframe->rot[1],
@@ -142,7 +143,8 @@ amoloader_data* loadAMO(const char* path) {
     return data;
 }
 
-int destroyAMO(amoloader_data* data) {
+int destroy_amo(struct amoloader_data *data)
+{
     int i;
 
     if(data == NULL) {

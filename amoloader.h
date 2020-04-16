@@ -34,10 +34,10 @@
  * @name: The name of the joint
  * @parent: A pointer to the parent joint
  */
-typedef struct amoloader_joint {
+struct amoloader_joint {
     char name[100];
-    struct amoloader_joint* parent;
-} amoloader_joint;
+    struct amoloader_joint *parent;
+};
 
 /*
  * A struct containing information about a keyframe, which alters the position of a joint
@@ -46,11 +46,11 @@ typedef struct amoloader_joint {
  * @joint: A pointer to the affected joint
  * @pos: 3 floats containing the position the joint should have at this keyframe
  */
-typedef struct amoloader_animation_keyframe_pos {
+struct amoloader_animation_keyframe_pos {
     float timestamp;
-    amoloader_joint* joint;
+    struct amoloader_joint *joint;
     float pos[3];
-} amoloader_animation_keyframe_pos;
+};
 
 /*
  * A struct containig information about a keyframe, which alters the rotation of a joint
@@ -59,11 +59,11 @@ typedef struct amoloader_animation_keyframe_pos {
  * @joint: A pointer to the affected joint
  * @rot: 4 floats containig the rotation in quaternions the joint should have at this keyframe
  */
-typedef struct amoloader_animation_keyframe_rot {
+struct amoloader_animation_keyframe_rot {
     float timestamp;
-    amoloader_joint* joint;
+    struct amoloader_joint *joint;
     float rot[4];
-} amoloader_animation_keyframe_rot;
+};
 
 /*
  * A struct containing information about one animation cycle
@@ -74,13 +74,13 @@ typedef struct amoloader_animation_keyframe_rot {
  * @keyframes_rot: An array of keyframes for the rotation of the joints
  * @keyframes_rot_count: The number of keyframes for the rotation
  */
-typedef struct amoloader_animation {
+struct amoloader_animation {
     char name[100];
-    amoloader_animation_keyframe_pos* keyframes_pos;
+    struct amoloader_animation_keyframe_pos *keyframes_pos;
     int keyframes_pos_count;
-    amoloader_animation_keyframe_rot* keyframes_rot;
+    struct amoloader_animation_keyframe_rot *keyframes_rot;
     int keyframes_rot_count;
-} amoloader_animation;
+};
 
 /*
  * A struct containing the parsed data of the amo file
@@ -98,20 +98,20 @@ typedef struct amoloader_animation {
  * @animations_count: The amount of animations
  * @amoloader_animations: An array of animations of the model
  */
-typedef struct amoloader_data {
+struct amoloader_data {
     int vertices_count;
-    float* vertex_buffer;
-    float* normal_buffer;
-    float* uv_buffer;
-    int* joint_buffer;
-    float* weight_buffer;
+    float *vertex_buffer;
+    float *normal_buffer;
+    float *uv_buffer;
+    int *joint_buffer;
+    float *weight_buffer;
     int indices_count;
-    unsigned int* index_buffer;
+    unsigned int *index_buffer;
     int joints_count;
-    amoloader_joint* joints;
+    struct amoloader_joint *joints;
     int animations_count;
-    amoloader_animation* animations;
-} amoloader_data;
+    struct amoloader_animation *animations;
+};
 
 /*
  * Loads the .amo file and parses its values into amoloader_data
@@ -120,7 +120,7 @@ typedef struct amoloader_data {
  * 
  * Returns: A pointer to an amoloader_data struct containing the parsed data or NULL if an error occurred
  */
-amoloader_data* loadAMO(const char* path);
+struct amoloader_data *load_amo(const char *path);
 
 /*
  * Destroys the amoloader_data struct
@@ -129,7 +129,7 @@ amoloader_data* loadAMO(const char* path);
  * 
  * Returns: 0 for success or -1 if an error occurred
  */
-int destroyAMO(amoloader_data* data);
+int destroy_amo(struct amoloader_data *data);
 
 /*
      &*                    #@,        
