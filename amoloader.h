@@ -1,7 +1,7 @@
 /*
  * zlib License
  * 
- * (C) 2020 enudstudios
+ * (C) 2020 Vasall
  * 
  * This software is provided 'as-is', without any express or implied
  * warranty.  In no event will the authors be held liable for any damages
