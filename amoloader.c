@@ -1,6 +1,6 @@
 #include "amoloader.h"
 
-struct amoloader_data *load_amo(const char *path)
+struct amoloader_data *amo_load(const char *path)
 {
     FILE *file;
     struct amoloader_data *data;
@@ -166,7 +166,7 @@ struct amoloader_data *load_amo(const char *path)
     return data;
 }
 
-int destroy_amo(struct amoloader_data *data)
+int amo_destroy(struct amoloader_data *data)
 {
     int i;
 

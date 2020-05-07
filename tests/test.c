@@ -2,7 +2,7 @@
 
 int main() {
     int i, j;
-    struct amoloader_data *data = load_amo("tests/cube.amo");
+    struct amoloader_data *data = amo_load("tests/cube.amo");
     if(data == NULL) {
         fprintf(stderr, "Couldn't load amo file\n");
         return -1;
@@ -52,6 +52,6 @@ int main() {
                                                                          data->animations[i].keyframes_rot[j].rot[3]);
         }
     }
-    destroy_amo(data);
+    amo_destroy(data);
     return 0;
 }

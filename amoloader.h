@@ -124,7 +124,7 @@ struct amoloader_data {
  * Returns: A pointer to an amoloader_data struct containing the parsed data or
  * NULL if an error occurred
  */
-struct amoloader_data *load_amo(const char *path);
+struct amoloader_data *amo_load(const char *path);
 
 /*
  * Destroys the amoloader_data struct
@@ -133,7 +133,7 @@ struct amoloader_data *load_amo(const char *path);
  * 
  * Returns: 0 for success or -1 if an error occurred
  */
-int destroy_amo(struct amoloader_data *data);
+int amo_destroy(struct amoloader_data *data);
 
 /*
      &*                    #@,        
