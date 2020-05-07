@@ -40,26 +40,29 @@ struct amoloader_joint {
 };
 
 /*
- * A struct containing information about a keyframe, which alters the position of a joint
+ * A struct containing information about a keyframe, which alters the position
+ * of a joint
  * 
  * @timestamp: The timestamp at which the joint should have this position
  * @joint: A pointer to the affected joint
  * @pos: 3 floats containing the position the joint should have at this keyframe
  */
-struct amoloader_animation_keyframe_pos {
+struct amoloader_keyframe_pos {
     float timestamp;
     struct amoloader_joint *joint;
     float pos[3];
 };
 
 /*
- * A struct containig information about a keyframe, which alters the rotation of a joint
+ * A struct containig information about a keyframe, which alters the rotation of
+ * a joint
  * 
  * @timestamp: The timestamp at which the joint should have this rotation
  * @joint: A pointer to the affected joint
- * @rot: 4 floats containig the rotation in quaternions the joint should have at this keyframe
+ * @rot: 4 floats containig the rotation in quaternions the joint should have at
+ * this keyframe
  */
-struct amoloader_animation_keyframe_rot {
+struct amoloader_keyframe_rot {
     float timestamp;
     struct amoloader_joint *joint;
     float rot[4];
@@ -70,16 +73,16 @@ struct amoloader_animation_keyframe_rot {
  * 
  * @name: The name of the animation
  * @keyframes_pos: An array of keyframes for the position of the joints
- * @keyframes_pos_count: The number of keyframes for the position
+ * @keyframes_pos_num: The number of keyframes for the position
  * @keyframes_rot: An array of keyframes for the rotation of the joints
- * @keyframes_rot_count: The number of keyframes for the rotation
+ * @keyframes_rot_num: The number of keyframes for the rotation
  */
 struct amoloader_animation {
     char name[100];
-    struct amoloader_animation_keyframe_pos *keyframes_pos;
-    int keyframes_pos_count;
-    struct amoloader_animation_keyframe_rot *keyframes_rot;
-    int keyframes_rot_count;
+    struct amoloader_keyframe_pos *keyframes_pos;
+    int keyframes_pos_num;
+    struct amoloader_keyframe_rot *keyframes_rot;
+    int keyframes_rot_num;
 };
 
 /*
@@ -118,7 +121,8 @@ struct amoloader_data {
  * 
  * @path: The file path to the .amo file
  * 
- * Returns: A pointer to an amoloader_data struct containing the parsed data or NULL if an error occurred
+ * Returns: A pointer to an amoloader_data struct containing the parsed data or
+ * NULL if an error occurred
  */
 struct amoloader_data *load_amo(const char *path);
 
