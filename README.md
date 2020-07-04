@@ -28,7 +28,7 @@ The library has only two functions:
 - `int amo_destroy(struct amoloader_data *data)`
 
 The `amoloader_data` struct contains the parsed data
-(See [amoloader.h](amoloader.h) for more details)
+(See [amoloader.h](amoloader.h#L89) for more details)
 ### Example
 ```c
 #include "amoloader.h"
