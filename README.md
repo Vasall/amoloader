@@ -16,12 +16,15 @@ if you want to check the functionality of the library, run
 ```
 make check
 ```
-You can compare the output to *tests/cube.amo*
+You can compare the output to *tests/cube.amo*  
+To install the library in the /usr path, run
+```
+make install
+```
 ## How to use
 To include amoloader into your project:
-1. copy **libamoloader.a** and **amoloader.h** into your project directory
-2. add `#include amoloader.h` to your .c file
-3. In your Makefile, add `-L. -lamoloader` to your compile instruction
+1. add `#include <amoloader.h>` to your .c file
+2. In your Makefile, add `-L. -lamoloader` to your compile instruction
 ___
 The library has only two functions:
 - `struct amoloader_data *amo_load(const char *path)`
