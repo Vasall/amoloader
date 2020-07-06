@@ -1,0 +1,9 @@
+includedir=${prefix}/include
+libdir=${prefix}/lib 
+
+Name: amoloader
+Description: Simple library that loads and parses Animated OBJ files
+URL: https://github.com/Vasall/amoloader
+Version: 0.1
+Libs: -L$(libdir) -lamoloader
+Cflags: -I$(includedir)
