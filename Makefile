@@ -3,13 +3,13 @@ PREFIX ?= /usr
 
 CC := gcc
 CPPFLAGS := -I.
-CFLAGS := -Wall -Wextra -std=c89 -ansi -pedantic
+CFLAGS := -Wall -Wextra -std=c89 -ansi -pedantic -flto
 
 .PHONY: all
 all: $(TARGET) amoloader.pc
 
 $(TARGET): amoloader.o
-	ar rcs $(TARGET) amoloader.o
+	gcc-ar rcs $(TARGET) amoloader.o
 
 amoloader.o: amoloader.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c amoloader.c
