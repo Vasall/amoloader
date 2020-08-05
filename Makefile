@@ -5,6 +5,8 @@ CC := gcc
 CPPFLAGS := -I.
 CFLAGS := -Wall -Wextra -std=c89 -ansi -pedantic -flto
 
+LIBNAME=$(subst .a,,$(subst lib,,$(TARGET)))
+
 .PHONY: all
 all: $(TARGET) amoloader.pc
 
@@ -16,11 +18,12 @@ amoloader.o: amoloader.c
 
 amoloader.pc: amoloader.pc.in
 	echo "prefix=$(PREFIX)" > amoloader.pc
+	echo "libname=$(LIBNAME)" >> amoloader.pc
 	cat amoloader.pc.in >> amoloader.pc
 
 .PHONY: check
 check:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o tests/test tests/test.c -L. -lamoloader
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o tests/test tests/test.c -L. -$(LIBNAME)
 	./tests/test
 
 .PHONY: install
