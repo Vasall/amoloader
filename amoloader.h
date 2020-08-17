@@ -88,6 +88,7 @@ struct amoloader_animation {
 /*
  * A struct containing the parsed data of the amo file
  * 
+ * @name: The name of the object
  * @vertices_count: The amount of vertices
  * @vertex_buffer: A 3-dimensional array of vertex positions
  * @normal_buffer: A 3-dimensional array of vertex normals
@@ -102,6 +103,7 @@ struct amoloader_animation {
  * @amoloader_animations: An array of animations of the model
  */
 struct amoloader_data {
+    char name[100];
     int vertices_count;
     float *vertex_buffer;
     float *normal_buffer;
@@ -120,20 +122,22 @@ struct amoloader_data {
  * Loads the .amo file and parses its values into amoloader_data
  * 
  * @path: The file path to the .amo file
+ * @count: Returns the amount of objects, the .amo file contains
  * 
  * Returns: A pointer to an amoloader_data struct containing the parsed data or
  * NULL if an error occurred
  */
-struct amoloader_data *amo_load(const char *path);
+struct amoloader_data *amo_load(const char *path, int *count);
 
 /*
  * Destroys the amoloader_data struct
  * 
  * @data: the amoloader_data struct that was recieved by loadAMO()
+ * @count: the amount of objects
  * 
  * Returns: 0 for success or -1 if an error occurred
  */
-int amo_destroy(struct amoloader_data *data);
+int amo_destroy(struct amoloader_data *data, int count);
 
 /*
      &*                    #@,        

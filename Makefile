@@ -23,7 +23,7 @@ amoloader.pc: amoloader.pc.in
 
 .PHONY: check
 check:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o tests/test tests/test.c -L. -$(LIBNAME)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o tests/test tests/test.c -L. -l$(LIBNAME)
 	./tests/test
 
 .PHONY: install
