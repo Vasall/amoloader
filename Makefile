@@ -1,48 +1,44 @@
-TARGET := libamoloader.a
-PREFIX ?= /usr
+# ------------------------------------------------
+# Generic Makefile, capable of including static
+# libraries
+#
+# Modified by:      admin@vasall.net
+# Date:             2020-01-09
+#
+# Original Author:  yanick.rochon@gmail.com
+# Date:             2011-08-10
+# ------------------------------------------------
 
-CC := gcc
-CPPFLAGS := -I.
-CFLAGS := -Wall -Wextra -std=c89 -ansi -pedantic -flto
+# Name of the created executable
+TARGET     := libamo.a
 
-LIBNAME=$(subst .a,,$(subst lib,,$(TARGET)))
+# Get the absolute path to the directory this makefile is in
+MKFILE_PTH := $(abspath $(lastword $(MAKEFILE_LIST)))
+MKFILE_DIR := $(dir $(MKFILE_PTH))
 
-.PHONY: all
-all: $(TARGET) amoloader.pc
+# The compiler to use
+CC         := gcc
+# Error flags for compiling
+ERRFLAGS   := -Wall -Wextra -Wmissing-prototypes -Wstrict-prototypes -Wold-style-definition
+# Compiling flags here
+CFLAGS     := -g -O0 -ansi -std=c89 -I. -I./inc/ -pedantic
 
-$(TARGET): amoloader.o
-	gcc-ar rcs $(TARGET) amoloader.o
+# The linker to use
+LINKER     := gcc
 
-amoloader.o: amoloader.c
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c amoloader.c
+# Change these to proper directories where each file should be
+SRCDIR     := src
+OBJDIR     := obj
 
-amoloader.pc: amoloader.pc.in
-	echo "prefix=$(PREFIX)" > amoloader.pc
-	echo "libname=$(LIBNAME)" >> amoloader.pc
-	cat amoloader.pc.in >> amoloader.pc
+SOURCES    := $(wildcard $(SRCDIR)/*.c)
+OBJECTS    := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
-.PHONY: check
-check:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o tests/test tests/test.c -L. -l$(LIBNAME)
-	./tests/test
+rm         := rm -f
 
-.PHONY: install
-install:
-	mkdir -p $(DESTDIR)$(PREFIX)/include
-	mkdir -p $(DESTDIR)$(PREFIX)/lib
-	mkdir -p $(DESTDIR)$(PREFIX)/lib/pkgconfig
-	cp amoloader.h $(DESTDIR)$(PREFIX)/include
-	cp $(TARGET) $(DESTDIR)$(PREFIX)/lib
-	cp amoloader.pc $(DESTDIR)$(PREFIX)/lib/pkgconfig
+$(TARGET): $(OBJECTS)
+	@ar -r -o $@ $^
+	@echo "Linking complete!"
 
-.PHONY: uninstall
-	rm -f $(DESTDIR)$(PREFIX)/include/amoloader.h
-	rm -f $(DESTDIR)$(PREFIX)/lib/$(TARGET)
-	rm -f $(DESTDIR)$(PREFIX)/lib/pkgconfig/amoloader.pc
-	rmdir --ignore-fail-on-non-empty $(DESTDIR)$(PREFIX)/include
-	rmdir --ignore-fail-on-non-empty $(DESTDIR)$(PREFIX)/lib/pkgconfig
-	rmdir --ignore-fail-on-non-empty $(DESTDIR)$(PREFIX)/lib
-
-.PHONY: clean
-clean:
-	-rm amoloader.o $(TARGET) amoloader.pc tests/test
+$(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
+	@$(CC) $(CFLAGS) $(ERRFLAGS) -c $< -o $@
+	@echo "Compiled "$<" successfully!"
