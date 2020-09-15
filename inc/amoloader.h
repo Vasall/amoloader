@@ -44,6 +44,7 @@ enum amo_format {
 struct amo_joint;
 struct amo_joint {
     char              name[100];
+    int               index;
     struct amo_joint  *par;
 };
 

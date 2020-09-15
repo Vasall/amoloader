@@ -22,14 +22,10 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	int tmp;
 	void *p;
 
-	printf("%s\n", strrchr(pth, '.'));
-
-#if 0
 	/* Check if file is a .amo file */
-	if(strcmp(strrchr(pth, '.'), ".amo") != 0) {
+	if(!(strcmp(strrchr(pth, '.'), ".amo") == 0 || 
+				strcmp(strrchr(pth, '.'), ".obj") == 0))
 		return NULL;
-	}
-#endif
 
 	/* Try to open the file */
 	if(!(fd = fopen(pth, "r")))
@@ -312,6 +308,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 				joint_tmp = &data->jnt_lst[tmp];
 
 			/* Set the parent-joint */
+			data->jnt_lst[tmp].index = joint_par;
 			data->jnt_lst[tmp].par = joint_tmp;
 		}
 		/* a <name> */
@@ -402,7 +399,6 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					&joint);
 
 			/* Set a pointer to the referenced joint */
-			printf("Read joint %d\n", joint);
 			keyfr->joints[joint - 1] = &data->jnt_lst[joint - 1];
 
 			/* Read the rest of the position-keyframe */
@@ -518,7 +514,6 @@ AMO_API void amo_destroy(struct amo_model *data)
 {
 	int i;
 	int j;
-	int k;
 
 	/* If data is NULL, just skip destroying */
 	if(!data)
@@ -528,25 +523,19 @@ AMO_API void amo_destroy(struct amo_model *data)
 	free(data->tex_buf);
 	free(data->nrm_buf);
 
-	printf("Destroy base buffers\n");
-
 	if(data->jnt_c != 0) {
 		free(data->vjnt_buf);
 		free(data->wgt_buf);
 		free(data->jnt_lst);
 
-		printf("Destroy joint buffers\n");
-
-		for(j = 0; j < data->ani_c; j++) {
-			for(k = 0; k < data->ani_lst[j].keyfr_c; k++) {
-				free(data->ani_lst[j].keyfr_lst[k].joints);
-				free(data->ani_lst[j].keyfr_lst[k].pos);
-				free(data->ani_lst[j].keyfr_lst[k].rot);
-
-				printf("Destroy keyframe %d\n", k);
+		for(i = 0; i < data->ani_c; i++) {
+			for(j = 0; j < data->ani_lst[i].keyfr_c; j++) {
+				free(data->ani_lst[i].keyfr_lst[j].joints);
+				free(data->ani_lst[i].keyfr_lst[j].pos);
+				free(data->ani_lst[i].keyfr_lst[j].rot);
 			}
 
-			free(data->ani_lst[j].keyfr_lst);
+			free(data->ani_lst[i].keyfr_lst);
 		}
 
 		free(data->ani_lst);
@@ -560,11 +549,9 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 		void **vtx, void **tex, void **nrm, int *idxnum,
 		unsigned int **idx)
 {
-	int i;
 	int j;
 	int k;
 	int tmp;
-	void *p;
 	char same = 0;
 	int num;
 
@@ -580,15 +567,12 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	int idx_i = 0;
 	int idx_bytes = 3;
 	int idx_sz = 3 * sizeof(unsigned int);
-	int c = 0;
 
 	/*
 	 * Count the number of indices and allocate the necessary memory.
 	 */
 
 	tmp = data->idx_c * 3;
-
-	printf("Allocate %d\n", tmp);
 
 	if(!(idx_conv = malloc(tmp * sizeof(int))))
 		return -1;
@@ -604,8 +588,6 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	idx_bytes = (data->format == AMO_FORMAT_OBJ) ? 3 : 5;
 	idx_sz = 3 * sizeof(unsigned int);
 
-	printf("idx-bytes: %d\n", idx_bytes);
-
 	num = data->idx_c * 3 * idx_bytes;
 	for(j = 0; j < num; j += idx_bytes) {
 		unsigned int cur[3], cmp[3];
@@ -613,7 +595,6 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 		same = 0;
 		memcpy(cur, &data->idx_buf[j], idx_sz);
 
-		c = 0;
 		for(k = 0; k < idx_i; k++) {
 			if(idx_conv[k] < 0)
 				continue;
@@ -623,17 +604,11 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 			if(memcmp(cur, cmp, idx_sz) == 0) {
 				same = 1;
 
-				printf("j %d found in k %d\n", j, k);
-
-				printf("%d\n", idx_i);
-
 				idx_conv[idx_i] = -1;
 				idx_arr[idx_i] = idx_arr[k];
 				idx_i++;
 				break;
 			}
-
-			c++;
 		}
 
 		if(!same) {
@@ -643,14 +618,7 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 			idx_i++;
 			vtx_num++;
 		}
-
-		c++;
 	}
-
-	printf("C: %d\n", c);
-
-	printf("vertices: %d\n", vtx_num);
-	printf("indices: %d\n", idx_i);
 
 	if(!(vtx_arr = malloc(vtx_num * 3 * sizeof(float))))
 		goto err_free_arr;
@@ -668,8 +636,6 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	for(j = 0; j < idx_i; j++) {
 		if(idx_conv[j] < 0)
 			continue;
-
-		printf("Conv: %d\n", idx_conv[j]);
 
 		/* Copy vertex-position */
 		tmp = data->idx_buf[idx_conv[j]];
