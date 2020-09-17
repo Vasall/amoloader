@@ -26,12 +26,8 @@ CFLAGS     := -g -O0 -ansi -std=c89 -I. -I./inc/ -pedantic
 # The linker to use
 LINKER     := gcc
 
-# Change these to proper directories where each file should be
-SRCDIR     := src
-OBJDIR     := obj
-
-SOURCES    := $(wildcard $(SRCDIR)/*.c)
-OBJECTS    := $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+SOURCES    := $(wildcard *.c)
+OBJECTS    := $(SOURCES:%.c=%.o)
 
 rm         := rm -f
 
@@ -39,6 +35,6 @@ $(TARGET): $(OBJECTS)
 	@ar -r -o $@ $^
 	@echo "Linking complete!"
 
-$(OBJECTS): $(OBJDIR)/%.o : $(SRCDIR)/%.c
+$(OBJECTS): %.o : %.c
 	@$(CC) $(CFLAGS) $(ERRFLAGS) -c $< -o $@
 	@echo "Compiled "$<" successfully!"

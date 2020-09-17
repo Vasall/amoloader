@@ -1,5 +1,4 @@
 #include "amoloader.h"
-#include "array.h"
 
 AMO_API struct amo_model *amo_load(const char *pth)
 {
