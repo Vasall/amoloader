@@ -80,7 +80,7 @@ struct amo_anim {
  * @vtx_buf: A 3-dimensional array of vertex positions
  * @tex_buf: A 2-dimensional array of uv coordinates
  * @nrm_buf: A 3-dimensional array of vertex normals
- * @jnt_buf: A 4-dimensional array of joints affecting the vertices
+ * @vjnt_buf: A 4-dimensional array of joints affecting the vertices
  * @wgt_buf: A 4-dimensional array of weights affecting the vertices
  * @idx_c: The amount of indices
  * @idx_buf: An array of indices
@@ -137,10 +137,26 @@ AMO_API void amo_destroy(struct amo_model *data);
 
 
 /*
- *  
+ * Get the mesh and vertex-joints of the model in an OpenGL-compatible-format
+ * where the data for each vertex is stored in the corresponding array and the#
+ * index-array contains the vertex-indices.
+ * Note that the returned arrays have to be freed after usage, to prevent
+ * memory-leaks.
+ *
+ * @data: Pointer to the data-buffer
+ * @vtxnum: A pointer to write the vertex-number to
+ * @vtx: A pointer to attach the vertex-buffer to
+ * @tex: A pointer to attach the texture-coordinate-buffer to
+ * @nrm: A pointer to attach the normal-buffer to
+ * @jnt: A pointer to attach the joint-index-buffer to
+ * @wgt: A pointer to attach the joint-weight-buffer to
+ * @idxnum: A pointer to write the index-number to
+ * @idx: A pointer to attach the index-buffer to
+ *
+ * Returns: 0 on success or -1 if an error occurred
  */
-AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
-		void **vtx, void **tex, void **nrm, int *idxnum,
+AMO_API int amo_getdata(struct amo_model *data, int *vtxnum, void **vtx,
+		void **tex, void **nrm, void **jnt, void **wgt, int *idxnum,
 		unsigned int **idx);
 
 /*

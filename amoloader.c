@@ -544,8 +544,8 @@ AMO_API void amo_destroy(struct amo_model *data)
 }
 
 
-AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
-		void **vtx, void **tex, void **nrm, int *idxnum,
+AMO_API int amo_getdata(struct amo_model *data, int *vtxnum, void **vtx,
+		void **tex, void **nrm, void **jnt, void **wgt, int *idxnum,
 		unsigned int **idx)
 {
 	int j;
@@ -553,6 +553,7 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	int tmp;
 	char same = 0;
 	int num;
+	char jnt_flg = 0;
 
 	int vtx_num = 0;
 	int vtx_i = 0;
@@ -560,12 +561,18 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	float *vtx_arr = NULL;
 	float *tex_arr = NULL;
 	float *nrm_arr = NULL;
+	int *jnt_arr = NULL;
+	float *wgt_arr = NULL;
 
 	int *idx_conv = NULL;
 	unsigned int *idx_arr = NULL;
 	int idx_i = 0;
 	int idx_bytes = 3;
 	int idx_sz = 3 * sizeof(unsigned int);
+
+	/* Return joints only if requested and possible */
+	if(jnt != NULL && wgt != NULL && data->jnt_c != 0)
+		jnt_flg = 1;
 
 	/*
 	 * Count the number of indices and allocate the necessary memory.
@@ -628,6 +635,14 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	if(!(nrm_arr = malloc(vtx_num * 3 * sizeof(float))))
 		goto err_free_arr;
 
+	if(jnt_flg) {
+		if(!(jnt_arr = malloc(vtx_num * 4 * sizeof(int))))
+			goto err_free_arr;
+
+		if(!(wgt_arr = malloc(vtx_num * 4 * sizeof(float))))
+			goto err_free_arr;
+	}
+
 
 	/* 
 	 * Fill in vertex-data.
@@ -651,6 +666,18 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 		memcpy(&nrm_arr[vtx_i * 3], &data->nrm_buf[tmp * 3],
 				3 * sizeof(float));
 
+		if(jnt_arr) {
+			/* Copy joint-indices */
+			tmp = data->idx_buf[idx_conv[j] + 3];
+			memcpy(&jnt_arr[vtx_i * 4], &data->vjnt_buf[tmp * 4],
+				4 * sizeof(int));
+
+			/* Copy joint-weights */
+			tmp = data->idx_buf[idx_conv[j] + 4];
+			memcpy(&wgt_arr[vtx_i * 4], &data->vjnt_buf[tmp * 4],
+				4 * sizeof(float));
+		}
+
 		vtx_i++;
 	}
 
@@ -666,6 +693,8 @@ AMO_API int amo_getmesh(struct amo_model *data, int *vtxnum,
 	*vtx = vtx_arr;
 	*tex = tex_arr;
 	*nrm = nrm_arr;
+	*jnt = jnt_arr;
+	*wgt = wgt_arr;
 
 	*idxnum = idx_i;
 	*idx = idx_arr;
@@ -675,6 +704,8 @@ err_free_arr:
 	if(vtx_arr) free(vtx_arr);
 	if(tex_arr) free(tex_arr);
 	if(nrm_arr) free(nrm_arr);
+	if(jnt_arr) free(jnt_arr);
+	if(wgt_arr) free(wgt_arr);
 	if(idx_conv) free(idx_conv);
 	if(idx_arr) free(idx_arr);
 	return -1;
