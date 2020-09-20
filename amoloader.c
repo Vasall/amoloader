@@ -338,8 +338,9 @@ AMO_API struct amo_model *amo_load(const char *pth)
 
 			/* Read the data of the animation */
 			tmp = data->ani_c - 1;
-			fscanf(fd, "%s",
-					data->ani_lst[tmp].name);
+			fscanf(fd, "%s %d",
+					data->ani_lst[tmp].name,
+					&data->ani_lst[tmp].dur);
 		}
 		/* k <timestamp> */
 		else if(strcmp(cmd_buf, "k") == 0) {
@@ -381,7 +382,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			/* Read the data of the keyframe */
 			tmp = ani->keyfr_c - 1;
 			fscanf(fd, "%f",
-					&ani->keyfr_lst[tmp].ts);
+					&ani->keyfr_lst[tmp].prog);
 		}
 		/* ap <joint> <x> <y> <z> */
 		else if(strcmp(cmd_buf, "ap") == 0) {
@@ -674,7 +675,7 @@ AMO_API int amo_getdata(struct amo_model *data, int *vtxnum, void **vtx,
 
 			/* Copy joint-weights */
 			tmp = data->idx_buf[idx_conv[j] + 4];
-			memcpy(&wgt_arr[vtx_i * 4], &data->vjnt_buf[tmp * 4],
+			memcpy(&wgt_arr[vtx_i * 4], &data->wgt_buf[tmp * 4],
 				4 * sizeof(float));
 		}
 

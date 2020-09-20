@@ -39,17 +39,26 @@ enum amo_format {
  * A struct symbolising a joint of the model.
  * 
  * @name: The name of the joint
+ * @index: The index of the joint in the joint-array
  * @par: A pointer to the parent joint
  */
 struct amo_joint;
 struct amo_joint {
-    char              name[100];
-    int               index;
-    struct amo_joint  *par;
+	char              name[100];
+	int               index;
+	struct amo_joint  *par;
 };
 
+/*
+ * A struct representing a single keyframe of an animation.
+ *
+ * @prog: The progression at which the keyframe occurrs
+ * @joints: An array containing pointers to the according joints
+ * @pos: The position of a joint in this keyframe
+ * @rot: The rotation of a joint in this keyframe
+ */
 struct amo_keyfr {
-	float ts;
+	float prog;
 
 	struct amo_joint  **joints;
 	float             *pos;
@@ -60,16 +69,17 @@ struct amo_keyfr {
  * A struct containing information about one animation cycle
  * 
  * @name: The name of the animation
- * @keyfr_pos: An array of keyframes for the position of the joints
- * @keyfr_pos_num: The number of keyframes for the position
- * @keyfr_rot: An array of keyframes for the rotation of the joints
- * @keyfr_rot_num: The numbegTr of keyframes for the rotation
+ * @dur: The duration of the animation in milliseconds
+ * @keyfr_c: The number of keyframes
+ * @keyfr_lst: An array containing all keyframes of the animation
  */
 struct amo_anim {
-    char                  name[100];
+	char                  name[100];
 
-    int                   keyfr_c;
-    struct amo_keyfr      *keyfr_lst;
+	int                   dur;
+
+	int                   keyfr_c;
+	struct amo_keyfr      *keyfr_lst;
 };
 
 /*
@@ -90,29 +100,29 @@ struct amo_anim {
  * @ani_lst: An array of animations of the model
  */
 struct amo_model {
-    char              name[100];
-    enum amo_format   format;
+	char              name[100];
+	enum amo_format   format;
 
-    int               vtx_c;
-    float             *vtx_buf;
+	int               vtx_c;
+	float             *vtx_buf;
 
-    int               tex_c;
-    float             *tex_buf;
+	int               tex_c;
+	float             *tex_buf;
 
-    int               nrm_c;
-    float             *nrm_buf;
+	int               nrm_c;
+	float             *nrm_buf;
 
-    int               *vjnt_buf;
-    float             *wgt_buf;
+	int               *vjnt_buf;
+	float             *wgt_buf;
 
-    int               idx_c;
-    unsigned int      *idx_buf;
+	int               idx_c;
+	unsigned int      *idx_buf;
 
-    int               jnt_c;
-    struct amo_joint  *jnt_lst;
-    
-    int               ani_c;
-    struct amo_anim   *ani_lst;
+	int               jnt_c;
+	struct amo_joint  *jnt_lst;
+
+	int               ani_c;
+	struct amo_anim   *ani_lst;
 };
 
 /*
