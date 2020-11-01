@@ -31,9 +31,24 @@
 #include <string.h>
 
 enum amo_format {
+	AMO_FORMAT_NONE,
 	AMO_FORMAT_OBJ,
+	AMO_FORMAT_COL,
 	AMO_FORMAT_AMO
 };
+
+
+/*
+ * A struct representing a simple collision box.
+ *
+ * @position: The position of the collision-box relative to the origion
+ * @size: The size of the collision-box
+ */
+struct amo_colbox {
+	float pos[3];
+	float size[3];
+};
+
 
 /*
  * A struct symbolising a joint of the model.
@@ -47,6 +62,7 @@ struct amo_joint {
 	char              name[100];
 	int               index;
 	struct amo_joint  *par;
+	float             mat[16];
 };
 
 /*
@@ -82,6 +98,9 @@ struct amo_anim {
 	struct amo_keyfr      *keyfr_lst;
 };
 
+
+#define AMO_COLM_BP (1<<0)
+
 /*
  * A struct containing the parsed mdl of the amo file
  * 
@@ -100,29 +119,32 @@ struct amo_anim {
  * @ani_lst: An array of animations of the model
  */
 struct amo_model {
-	char              name[100];
-	enum amo_format   format;
+	char               name[100];
+	enum amo_format    format;
 
-	int               vtx_c;
-	float             *vtx_buf;
+	int                vtx_c;
+	float              *vtx_buf;
 
-	int               tex_c;
-	float             *tex_buf;
+	int                tex_c;
+	float              *tex_buf;
 
-	int               nrm_c;
-	float             *nrm_buf;
+	int                nrm_c;
+	float              *nrm_buf;
 
-	int               *vjnt_buf;
-	float             *wgt_buf;
+	int                *vjnt_buf;
+	float              *wgt_buf;
 
-	int               idx_c;
-	unsigned int      *idx_buf;
+	int                idx_c;
+	unsigned int       *idx_buf;
 
-	int               jnt_c;
-	struct amo_joint  *jnt_lst;
+	int                jnt_c;
+	struct amo_joint   *jnt_lst;
 
-	int               ani_c;
-	struct amo_anim   *ani_lst;
+	int                ani_c;
+	struct amo_anim    *ani_lst;
+
+	int                col_mask;
+	struct amo_colbox  bp_col;
 };
 
 /*

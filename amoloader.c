@@ -7,7 +7,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	struct amo_model *data;
 
 	char cmd_buf[256];
-	enum amo_format format;
+	enum amo_format format = AMO_FORMAT_NONE;
 
 	int vtx_num = 200;
 	int tex_num  = 200;
@@ -22,8 +22,11 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	void *p;
 
 	/* Check if file is a .amo file */
-	if(!(strcmp(strrchr(pth, '.'), ".amo") == 0 || 
-				strcmp(strrchr(pth, '.'), ".obj") == 0))
+	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
+		;
+	else if(strcmp(strrchr(pth, '.'), ".obj") == 0)
+		;
+	else
 		return NULL;
 
 	/* Try to open the file */
@@ -34,29 +37,52 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	if(!(data = calloc(sizeof(struct amo_model), 1)))
 		goto err_close_file;
 
+	/*
+	 * Search for the format-type.
+	 *
+	 * <format-type> <model-name>
+	 */
+	while(fscanf(fd, "%s", cmd_buf) != EOF) {
+		if(strcmp(cmd_buf, "o") == 0) {
+			format = AMO_FORMAT_OBJ;
+			break;
+		}
+		else if(strcmp(cmd_buf, "cl") == 0) {
+			format = AMO_FORMAT_COL;
+			break;
+		}
+		else if(strcmp(cmd_buf, "ao") == 0) {
+			format = AMO_FORMAT_AMO;
+			break;
+		}
+	}
+
+	/*
+	 * If no format-type has been found, then terminate.
+	 */
+	data->format = format;
+	if(format == AMO_FORMAT_NONE)
+		return NULL;
+
+	/*
+	 * Read the model-name.
+	 */
+	fscanf(fd, "%s", data->name);
+
+
+	/*
+	 * Initialize the data-attributes.
+	 */
+	data->col_mask = 0;
+
 	/* 
 	 * Go through every line and read the first word. If it's a valid amo
 	 * keyword read the arguments and put them into the right position in
 	 * the data struct.
 	 */
 	while(fscanf(fd, "%s", cmd_buf) != EOF) {
-		/* o <name>  - or -  ao <name> */
-		if(strcmp(cmd_buf, "o") == 0 || strcmp(cmd_buf, "ao") == 0) {
-			/* Get the name of the current model */
-			fscanf(fd, "%s", data->name);
-
-			/* Set format of model */
-			if(strcmp(cmd_buf, "o") == 0) {
-				data->format = AMO_FORMAT_OBJ;
-			}
-			else if(strcmp(cmd_buf, "ao") == 0) {
-				data->format = AMO_FORMAT_AMO;
-			}
-
-			format = data->format;
-		}
 		/* v <x> <y> <z> */
-		else if(strcmp(cmd_buf, "v") == 0) {
+		if(strcmp(cmd_buf, "v") == 0) {
 			/* Increment the number of vertices */
 			data->vtx_c++;
 
@@ -113,6 +139,9 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			fscanf(fd, "%f %f",
 					&data->tex_buf[tmp + 0],
 					&data->tex_buf[tmp + 1]);
+
+			/* Flip uv-coordinates */
+			data->tex_buf[tmp + 1] = 1.0 - data->tex_buf[tmp + 1];
 		}
 		/* vn <x> <y> <z> */
 		else if(strcmp(cmd_buf, "vn") == 0) {
@@ -269,6 +298,19 @@ AMO_API struct amo_model *amo_load(const char *pth)
 				}
 			}
 		}
+		/* bc <x> <y> <z> <sx> <sy> <sz> */
+		else if(strcmp(cmd_buf, "bc") == 0) {
+			/* Update the collision-mask */
+			data->col_mask |= AMO_COLM_BP;
+			
+			fscanf(fd, "%f %f %f %f %f %f",
+					&data->bp_col.pos[0],
+					&data->bp_col.pos[1],
+					&data->bp_col.pos[2],
+					&data->bp_col.size[0],
+					&data->bp_col.size[1],
+					&data->bp_col.size[2]);
+		}
 		/* j <name> <parent> */
 		else if(strcmp(cmd_buf, "j") == 0) {
 			int joint_par;
@@ -300,11 +342,21 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					data->jnt_lst[tmp].name,
 					&joint_par);
 
+			for(i = 0; i < 16; i++)
+				fscanf(fd, "%f",
+						&data->jnt_lst[tmp].mat[i]);
+
 			/* Special treatment for root joint */
-			if(joint_par == -1)
+			if(joint_par == -1) {
 				joint_tmp = NULL;
-			else
+			}
+			else {
+				/* Correct the parent-index */
+				joint_par -= 1;
+
+				/* Get reference to parent-joint */
 				joint_tmp = &data->jnt_lst[tmp];
+			}
 
 			/* Set the parent-joint */
 			data->jnt_lst[tmp].index = joint_par;
@@ -710,5 +762,4 @@ err_free_arr:
 	if(idx_conv) free(idx_conv);
 	if(idx_arr) free(idx_arr);
 	return -1;
-
 }
