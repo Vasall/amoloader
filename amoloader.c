@@ -1,5 +1,6 @@
 #include "amoloader.h"
 
+
 AMO_API struct amo_model *amo_load(const char *pth)
 {
 	FILE *fd;
@@ -12,16 +13,21 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	int vtx_num = 200;
 	int tex_num  = 200;
 	int nrm_num = 200;
-	int vjnt_c = 0, vjnt_num = 200;
-	int wgt_c = 0, wgt_num = 200;
-	int jnt_num = 200, ani_num = 200;
-	int keyfr_num = 20, idx_num = 200;
+	int vjnt_c = 0;
+	int vjnt_num = 200;
+	int wgt_c = 0;
+	int wgt_num = 200;
+	int jnt_num = 200;
+	int ani_num = 200;
+	int keyfr_num = 20;
+	int idx_num = 200;
 
-	int i, j;
+	int i;
+	int j;
 	int tmp;
 	void *p;
 
-	/* Check if file is a .amo file */
+	/* Check if file is has the right extension */
 	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
 		;
 	else if(strcmp(strrchr(pth, '.'), ".obj") == 0)

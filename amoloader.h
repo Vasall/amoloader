@@ -30,6 +30,10 @@
 #include <stdio.h>
 #include <string.h>
 
+/*
+ * The different data-formats specifying which data is contained in the returned
+ * data-struct.
+ */
 enum amo_format {
 	AMO_FORMAT_NONE,
 	AMO_FORMAT_OBJ,
@@ -98,7 +102,9 @@ struct amo_anim {
 	struct amo_keyfr      *keyfr_lst;
 };
 
-
+/*
+ * The mask for the different collision-buffers.
+ */
 #define AMO_COLM_BP (1<<0)
 
 /*
@@ -190,31 +196,5 @@ AMO_API void amo_destroy(struct amo_model *data);
 AMO_API int amo_getdata(struct amo_model *data, int *vtxnum, void **vtx,
 		void **tex, void **nrm, void **jnt, void **wgt, int *idxnum,
 		unsigned int **idx);
-
-/*
- *    &*                    #@,        
- *   #@@%                  @@@&        
- *   @@@@@#@@@@@@@@@@@@@@@@@@@@        
- *   &@@@@@@@@@@@@@@@@@@@@@@@@%        
- *   /@@@@@@@@@@@@@@@@@@@@@@@@@@&      
- *  %@@@@*   *@@@@@@@(   .@@@@@@@@*    
- * #@@@&       %@@@&       *@@@@@@@,   
- * @@@@@       @@@@@       %@@@@@@@@   
- * @@@@@@@%%%@@@@@@@@@&%%@@@@@@@@@@@.  
- * @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@.  
- * ,@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   
- *  /@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   
- *    @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   
- *      @@@@@@@@@@@@@@@@@@@@@@@@@@@@   
- *        &@@@@@@@@@@@@@@@@@@@@@@@@@%  
- *          (@@@@@@@@@@@@@@@@@.&@@@@@& 
- *             ,@@@@@@@@@@@@@@#    .,,.
- *                 ,@@@@@@@@@@@@       
- *                       #&@@@@@@,     
- *                               .     
- *
- * Wanna see something good?
- * https://youtu.be/dQw4w9WgXcQ
- */
 
 #endif
