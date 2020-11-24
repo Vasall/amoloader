@@ -1,31 +1,29 @@
 #include "amoloader.h"
 
-
 AMO_API struct amo_model *amo_load(const char *pth)
 {
-	FILE *fd;
-
-	struct amo_model *data;
-
-	char cmd_buf[256];
-	enum amo_format format = AMO_FORMAT_NONE;
-
-	int vtx_num = 200;
-	int tex_num  = 200;
-	int nrm_num = 200;
-	int vjnt_c = 0;
-	int vjnt_num = 200;
-	int wgt_c = 0;
-	int wgt_num = 200;
-	int jnt_num = 200;
-	int ani_num = 200;
-	int keyfr_num = 20;
-	int idx_num = 200;
-
 	int i;
 	int j;
 	int tmp;
 	void *p;
+
+	FILE *fd;
+	struct amo_model *data;
+
+	char cmd_buf[128];
+	enum amo_format format = AMO_FORMAT_NONE;
+
+	int vtx_num =     200;
+	int tex_num  =    200;
+	int nrm_num =     200;
+	int vjnt_num =    200;
+	int wgt_num =     200;
+	int jnt_num =     200;
+	int ani_num =     200;
+	int keyfr_num =    20;
+	int idx_num =     200;
+	int cm_vtx_num =  200;
+	int cm_idx_num =  200;
 
 	/* Check if file is has the right extension */
 	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
@@ -39,7 +37,11 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	if(!(fd = fopen(pth, "r")))
 		return NULL;
 
-	/* Allocate memory for the data-struct */
+	/* 
+	 * Allocate memory for the data-struct.
+	 * Note that as we use calloc for allocating memory, all bytes will be
+	 * set to 0, and therefore we dont have to initialize the attributes.
+	 */
 	if(!(data = calloc(sizeof(struct amo_model), 1)))
 		goto err_close_file;
 
@@ -74,12 +76,6 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	 * Read the model-name.
 	 */
 	fscanf(fd, "%s", data->name);
-
-
-	/*
-	 * Initialize the data-attributes.
-	 */
-	data->col_mask = 0;
 
 	/* 
 	 * Go through every line and read the first word. If it's a valid amo
@@ -119,7 +115,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		}
 		/* vt <x> <y> */
 		else if(strcmp(cmd_buf, "vt") == 0) {
-			/* Increment the number of uv-coordinates */
+			/* Increment the number of texture-coordinates */
 			data->tex_c++;
 
 			/* Allocate memory if necessary */
@@ -182,17 +178,17 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		/* vj <joint_1> <joint_2> <joint_3> <joint_4> */
 		else if(strcmp(cmd_buf, "vj") == 0) {
 			/* Increment the number of vertex-joints */
-			vjnt_c++;
+			data->vjnt_c++;
 
 			/* Allocate memory if necessary */	
-			if(vjnt_c == 1) {
+			if(data->vjnt_c == 1) {
 				vjnt_num = 200;
 				tmp = sizeof(int) * 4 * vjnt_num;
 
 				if(!(data->vjnt_buf = calloc(1, tmp)))
 					goto err_free_data;
 			}
-			else if(vjnt_c > vjnt_num) {
+			else if(data->vjnt_c > vjnt_num) {
 				vjnt_num *= 1.5;
 				tmp = sizeof(int) * 4 * vjnt_num;
 
@@ -203,7 +199,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			}
 
 			/* Read the data of the vertex-joint */
-			tmp = (vjnt_c - 1) * 4;
+			tmp = (data->vjnt_c - 1) * 4;
 			fscanf(fd, "%d %d %d %d",
 					&data->vjnt_buf[tmp + 0],
 					&data->vjnt_buf[tmp + 1],
@@ -213,17 +209,17 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		/* vw <weight_1> <weight_2> <weight_3> <weight_4> */
 		else if(strcmp(cmd_buf, "vw") == 0) {
 			/* Increment the number of joints */
-			wgt_c++;
+			data->wgt_c++;
 
 			/* Allocate memory if necessary */	
-			if(wgt_c == 1) {
+			if(data->wgt_c == 1) {
 				wgt_num = 200;
 				tmp = sizeof(float) * 4 * wgt_num;
 
 				if(!(data->wgt_buf = calloc(1, tmp)))
 					goto err_free_data;
 			}
-			else if(wgt_c > wgt_num) {
+			else if(data->wgt_c > wgt_num) {
 				wgt_num *= 1.5;
 				tmp = sizeof(float) * 4 * wgt_num;
 
@@ -234,7 +230,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			}
 
 			/* Read the data of the new weight */
-			tmp = (wgt_c - 1) * 4;
+			tmp = (data->wgt_c - 1) * 4;
 			fscanf(fd, "%f %f %f %f",
 					&data->wgt_buf[tmp + 0],
 					&data->wgt_buf[tmp + 1],
@@ -303,19 +299,6 @@ AMO_API struct amo_model *amo_load(const char *pth)
 
 				}
 			}
-		}
-		/* bc <x> <y> <z> <sx> <sy> <sz> */
-		else if(strcmp(cmd_buf, "bc") == 0) {
-			/* Update the collision-mask */
-			data->col_mask |= AMO_COLM_BP;
-			
-			fscanf(fd, "%f %f %f %f %f %f",
-					&data->bp_col.pos[0],
-					&data->bp_col.pos[1],
-					&data->bp_col.pos[2],
-					&data->bp_col.size[0],
-					&data->bp_col.size[1],
-					&data->bp_col.size[2]);
 		}
 		/* j <name> <parent> */
 		else if(strcmp(cmd_buf, "j") == 0) {
@@ -491,6 +474,95 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					&keyfr->rot[tmp + 2],
 					&keyfr->rot[tmp + 3]);
 		}
+		/* bp <x> <y> <z> <sx> <sy> <sz> */
+		else if(strcmp(cmd_buf, "bp") == 0) {
+			/* Update the collision-mask */
+			data->col_mask |= AMO_COLM_BP;
+			
+			fscanf(fd, "%f %f %f %f %f %f",
+					&data->bp_col.pos[0],
+					&data->bp_col.pos[1],
+					&data->bp_col.pos[2],
+					&data->bp_col.scl[0],
+					&data->bp_col.scl[1],
+					&data->bp_col.scl[2]);
+		}
+		/* ne <x> <y> <z> <sx> <sy> <sz> */
+		else if(strcmp(cmd_buf, "ne") == 0) {
+			/* Update the collision-mask */
+			data->col_mask |= AMO_COLM_NE;
+
+			fscanf(fd, "%f %f %f %f %f %f",
+					&data->ne_col.pos[0],
+					&data->ne_col.pos[1],
+					&data->ne_col.pos[2],
+					&data->ne_col.scl[0],
+					&data->ne_col.scl[1],
+					&data->ne_col.scl[2]);
+		}
+		/* cv <x> <y> <z> */
+		else if(strcmp(cmd_buf, "cv") == 0) {
+			/* Update the collision-mask */
+			data->col_mask |= AMO_COLM_CM;
+
+			/* Increment the number of vertices */
+			data->cm_vtx_c++;
+
+			/* Allocate memory if necessary */
+			if(data->cm_vtx_c == 1) {
+				cm_vtx_num = 200;
+				tmp = sizeof(float) * 3 * cm_vtx_num;
+
+				if(!(data->cm_vtx_buf = calloc(1, tmp)))
+					goto err_free_data;
+			}
+			else if(data->cm_vtx_c > cm_vtx_num) {
+				cm_vtx_num *= 1.5;
+				tmp = sizeof(float) * 3 * cm_vtx_num;
+
+				if(!(p = realloc(data->cm_vtx_buf, tmp)))
+					goto err_free_data;
+
+				data->cm_vtx_buf = p;
+			}
+
+			/* Read the data of the new vertex */
+			tmp = (data->cm_vtx_c - 1) * 3;
+			fscanf(fd, "%f %f %f",
+					&data->cm_vtx_buf[tmp + 0],
+					&data->cm_vtx_buf[tmp + 1],
+					&data->cm_vtx_buf[tmp + 2]);
+		}
+		/* ci <v1> <v2> <v3> */
+		else if(strcmp(cmd_buf, "ci") == 0) {
+			/* Increment the number of index-blocks */
+			data->cm_idx_c++;
+
+			/* Allocate memory if necessary */
+			if(data->cm_idx_c == 1) {
+				cm_idx_num = 200;
+				tmp = sizeof(int) * 3 * cm_idx_num;
+
+				if(!(data->cm_idx_buf = calloc(1, tmp)))
+					goto err_free_data;
+			}
+			else if(data->cm_idx_c > cm_idx_num) {
+				cm_idx_num *= 1.5;
+				tmp = sizeof(int) * 3 * cm_idx_num;
+
+				if(!(p = realloc(data->cm_idx_buf, tmp)))
+					goto err_free_data;
+
+				data->cm_idx_buf = p;
+			}
+
+			/* Read the data of the new vertex */
+			tmp = (data->cm_idx_c - 1) * 3;
+			fscanf(fd, "%d %d %d",
+					&data->cm_idx_buf[tmp + 0],
+					&data->cm_idx_buf[tmp + 1],
+					&data->cm_idx_buf[tmp + 2]);
+		}
 	}
 
 	/* 
@@ -519,12 +591,12 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	data->nrm_buf = p;
 
 	/* vertex-joint-buffer */
-	tmp = vjnt_c * 4 * sizeof(int);
+	tmp = data->vjnt_c * 4 * sizeof(int);
 	if(!(p = realloc(data->vjnt_buf, tmp))) goto err_free_data;
 	data->vjnt_buf = p;
 
 	/* weight-buffer */
-	tmp = wgt_c * 4 * sizeof(float);
+	tmp = data->wgt_c * 4 * sizeof(float);
 	if(!(p = realloc(data->wgt_buf, tmp))) goto err_free_data;
 	data->wgt_buf = p;
 
@@ -551,6 +623,16 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		if(!(p = realloc(ani->keyfr_lst, tmp))) goto err_free_data;
 		ani->keyfr_lst = p;
 	}
+
+	/* collision-vertex-buffer */
+	tmp = data->cm_vtx_c * 3 * sizeof(float);
+	if(!(p = realloc(data->cm_vtx_buf, tmp))) goto err_free_data;
+	data->cm_vtx_buf = p;
+
+	/* collision-index-buffer */
+	tmp = data->cm_idx_c * 3 * sizeof(int);
+	if(!(p = realloc(data->cm_idx_buf, tmp))) goto err_free_data;
+	data->cm_idx_buf = p;
 
 	/* Close the file */
 	fclose(fd);

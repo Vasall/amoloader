@@ -24,8 +24,7 @@
 #ifndef _AMOLOADER_H
 #define _AMOLOADER_H
 
-#define AMO_API extern
-
+#include "util.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +34,7 @@
  * data-struct.
  */
 enum amo_format {
-	AMO_FORMAT_NONE,
+	 AMO_FORMAT_NONE,
 	AMO_FORMAT_OBJ,
 	AMO_FORMAT_COL,
 	AMO_FORMAT_AMO
@@ -48,9 +47,9 @@ enum amo_format {
  * @position: The position of the collision-box relative to the origion
  * @size: The size of the collision-box
  */
-struct amo_colbox {
+struct amo_shape3d {
 	float pos[3];
-	float size[3];
+	float scl[3];
 };
 
 
@@ -106,6 +105,8 @@ struct amo_anim {
  * The mask for the different collision-buffers.
  */
 #define AMO_COLM_BP (1<<0)
+#define AMO_COLM_NE (1<<1)
+#define AMO_COLM_CM (1<<2)
 
 /*
  * A struct containing the parsed mdl of the amo file
@@ -128,33 +129,43 @@ struct amo_model {
 	char               name[100];
 	enum amo_format    format;
 
-	int                vtx_c;
-	float              *vtx_buf;
+	int                 vtx_c;
+	float               *vtx_buf;
 
-	int                tex_c;
-	float              *tex_buf;
+	int                 tex_c;
+	float               *tex_buf;
 
-	int                nrm_c;
-	float              *nrm_buf;
+	int                 nrm_c;
+	float               *nrm_buf;
+ 
+	int                 vjnt_c;
+	int                 *vjnt_buf;
 
-	int                *vjnt_buf;
-	float              *wgt_buf;
+	int                 wgt_c;
+	float               *wgt_buf;
 
-	int                idx_c;
-	unsigned int       *idx_buf;
+	int                 idx_c;
+	unsigned int        *idx_buf;
 
-	int                jnt_c;
-	struct amo_joint   *jnt_lst;
+	int                 jnt_c;
+	struct amo_joint    *jnt_lst;
 
-	int                ani_c;
-	struct amo_anim    *ani_lst;
+	int                 ani_c;
+	struct amo_anim     *ani_lst;
 
-	int                col_mask;
-	struct amo_colbox  bp_col;
+	int                 col_mask;
+	struct amo_shape3d  bp_col;
+	struct amo_shape3d  ne_col;
+
+	int                 cm_vtx_c;
+	float               *cm_vtx_buf;
+	int                 cm_idx_c;
+	int                 *cm_idx_buf;
+	float               *cm_nrm_buf;
 };
 
 /*
- * Loads the .amo file and parses its values into amo_model
+ * Loads the dot-amo file and parses its values into amo_model.
  * 
  * @pth: The file path to the dot-amo file
  * 
@@ -165,7 +176,7 @@ AMO_API struct amo_model *amo_load(const char *pth);
 
 
 /*
- * Destroys the amo_model struct
+ * Destroys the amo_model struct.
  * 
  * @data: An array of models previously created by amo_load()
  * 
