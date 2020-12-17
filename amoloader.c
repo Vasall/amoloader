@@ -562,6 +562,10 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					&data->cm_idx_buf[tmp + 0],
 					&data->cm_idx_buf[tmp + 1],
 					&data->cm_idx_buf[tmp + 2]);
+
+			data->cm_idx_buf[tmp + 0] -= 1;
+			data->cm_idx_buf[tmp + 1] -= 1;
+			data->cm_idx_buf[tmp + 2] -= 1;
 		}
 	}
 
