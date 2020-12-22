@@ -36,7 +36,6 @@
 enum amo_format {
 	 AMO_FORMAT_NONE,
 	AMO_FORMAT_OBJ,
-	AMO_FORMAT_COL,
 	AMO_FORMAT_AMO
 };
 
@@ -102,6 +101,14 @@ struct amo_anim {
 };
 
 /*
+ * The mask for the different data-attributes.
+ */
+#define AMO_DM_MDL (1<<0)
+#define AMO_DM_RIG (1<<1)
+#define AMO_DM_ANI (1<<2)
+#define AMO_DM_COL (1<<3)
+
+/*
  * The mask for the different collision-buffers.
  */
 #define AMO_COLM_BP (1<<0)
@@ -126,8 +133,8 @@ struct amo_anim {
  * @ani_lst: An array of animations of the model
  */
 struct amo_model {
-	char               name[100];
-	enum amo_format    format;
+	char                name[100];
+	unsigned int        data_m;
 
 	int                 vtx_c;
 	float               *vtx_buf;
