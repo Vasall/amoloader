@@ -104,6 +104,7 @@ struct amo_anim {
 /*
  * The mask for the different data-attributes.
  */
+#define AMO_M_NONE 0
 #define AMO_M_MDL (1<<0)
 #define AMO_M_RIG (1<<1)
 #define AMO_M_ANI (1<<2)
