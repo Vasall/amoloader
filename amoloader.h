@@ -24,7 +24,8 @@
 #ifndef _AMOLOADER_H
 #define _AMOLOADER_H
 
-#include "util.h"
+#include "define.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,7 +35,7 @@
  * data-struct.
  */
 enum amo_format {
-	 AMO_FORMAT_NONE,
+	AMO_FORMAT_NONE,
 	AMO_FORMAT_OBJ,
 	AMO_FORMAT_AMO
 };
@@ -103,17 +104,15 @@ struct amo_anim {
 /*
  * The mask for the different data-attributes.
  */
-#define AMO_DM_MDL (1<<0)
-#define AMO_DM_RIG (1<<1)
-#define AMO_DM_ANI (1<<2)
-#define AMO_DM_COL (1<<3)
+#define AMO_M_NONE 0
+#define AMO_M_MDL (1<<0)
+#define AMO_M_RIG (1<<1)
+#define AMO_M_ANI (1<<2)
 
-/*
- * The mask for the different collision-buffers.
- */
-#define AMO_COLM_BP (1<<0)
-#define AMO_COLM_NE (1<<1)
-#define AMO_COLM_CM (1<<2)
+#define AMO_M_CBP (1<<3)
+#define AMO_M_CNE (1<<4)
+#define AMO_M_CCM (1<<5)
+
 
 /*
  * A struct containing the parsed mdl of the amo file
@@ -134,7 +133,8 @@ struct amo_anim {
  */
 struct amo_model {
 	char                name[100];
-	unsigned int        data_m;
+	enum amo_format     format;
+	unsigned int        attr_m;
 
 	int                 vtx_c;
 	float               *vtx_buf;
@@ -144,7 +144,7 @@ struct amo_model {
 
 	int                 nrm_c;
 	float               *nrm_buf;
- 
+
 	int                 vjnt_c;
 	int                 *vjnt_buf;
 
@@ -154,13 +154,24 @@ struct amo_model {
 	int                 idx_c;
 	unsigned int        *idx_buf;
 
+	/*
+	 * joints
+	 */
+
 	int                 jnt_c;
 	struct amo_joint    *jnt_lst;
+
+	/*
+	 * animations
+	 */
 
 	int                 ani_c;
 	struct amo_anim     *ani_lst;
 
-	int                 col_mask;
+	/*
+	 * collision-buffers 
+	 */
+
 	struct amo_shape3d  bp_col;
 	struct amo_shape3d  ne_col;
 
