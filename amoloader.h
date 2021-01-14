@@ -57,13 +57,14 @@ struct amo_shape3d {
  * A struct symbolising a joint of the model.
  * 
  * @name: The name of the joint
- * @idx: The index of the joint in the joint-array
+ * @index: The index of the joint in the joint-array
+ * @par: A pointer to the parent joint
  */
 struct amo_joint;
 struct amo_joint {
 	char              name[100];
-	int               idx;
-	int               par_idx;
+	int               index;
+	struct amo_joint  *par;
 	float             mat[16];
 };
 
@@ -96,7 +97,8 @@ struct amo_anim {
 
 	int                   dur;
 
-	struct amo_array      keyfr;
+	int                   keyfr_c;
+	struct amo_keyfr      *keyfr_lst;
 };
 
 /*
