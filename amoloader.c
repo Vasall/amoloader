@@ -3,72 +3,99 @@
 #include "array.h"
 #include <stdint.h>
 
+/* Define the indices of the different arrays during loading */
+enum AMO_ARRI {
+	AMO_ARR_VTX = 0x0,
+	AMO_ARR_TEX = 0x1,
+	AMO_ARR_NRM = 0x2,
+	AMO_ARR_VJN = 0x3,
+	AMO_ARR_VWG = 0x4,
+	AMO_ARR_IDX = 0x5,
+	AMO_ARR_JNT = 0x6,
+	AMO_ARR_ANI = 0x7,
+	AMO_ARR_KFR = 0x8,
+	AMO_ARR_CMV = 0x9,
+	AMO_ARR_CMI = 0xa
+};
 
 
-AMO_API struct amo_model *amo_load(const char *pth)
+/*
+ * Initialize the arrays depending on the given mask.
+ *
+ * @arrlst: The arrays to initialize
+ * @attr_m: The attribute-mask
+ */
+AMO_INTERN void amo_init_arrs(struct amo_array *arrlst, uint32_t attr_m)
 {
-	int i;
-	int j;
-	int tmp;
-	void *p;
+	/* Vertex-array */
+	size = 3 * sizeof(float); 
+	amo_arr_init(&arrlst[AMO_ARR_VTX], size);
 
-	FILE *fd;
-	struct amo_model *data;
+	/* Texture-array */
+	size = 2 * sizeof(float);
+	amo_arr_init(&arrlst[AMO_ARR_TEX], size);
 
-	char cmd_buf[128];
-	enum amo_format format = AMO_FORMAT_NONE;
-	uint32_t attr_m = AMO_M_NONE;
+	/* Normal-vector-array */
+	size = 3 * sizeof(float);
+	amo_arr_init(&arrlst[AMO_ARR_NRM], size);
 
-#if 0
-	struct amo_array vtx_a;
-	struct amo_array tex_a;
-	struct amo_array nrm_a;
-	struct amo_array vjn_a;
-	struct amo_array vwg_a;
-	struct amo_array jnt_a;
-	struct amo_array ani_a;
-	struct amo_array kfr_a;
-	struct amo_array idx_a;
-	struct amo_array cmv_a;
-	struct amo_array cmi_a;
-#endif
+	/* Vertex-joint-array */
+	size = 4 * sizeof(int);
+	amo_arr_init(&arrlst[AMO_ARR_VJN], size);
 
-	int vtx_num =     200;
-	int tex_num  =    200;
-	int nrm_num =     200;
-	int vjnt_num =    200;
-	int wgt_num =     200;
-	int jnt_num =     200;
-	int ani_num =     200;
-	int keyfr_num =    20;
-	int idx_num =     200;
-	int cm_vtx_num =  200;
-	int cm_idx_num =  200;
+	/* Vertex-joint-weight-array */
+	size = 4 * sizeof(float);
+	amo_arr_init(&arrlst[AMO_ARR_VWG], size);
 
-	/* Check if file is has the right extension */
-	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
-		;
-	else if(strcmp(strrchr(pth, '.'), ".obj") == 0)
-		;
-	else
-		return NULL;
+	/* Index-array */
+	size = ((attr_m & AMO_M_RIG) ? 5 : 3) * sizeof(unsigned int);
+	amo_arr_init(&arrlst[AMO_ARR_IDX], size);
 
-	/* Try to open the file */
-	if(!(fd = fopen(pth, "r")))
-		return NULL;
+	/* Joint-array */
+	size = sizeof(struct amo_joint);
+	amo_arr_init(&arrlst[AMO_ARR_JNT], size);
 
-	/* 
-	 * Allocate memory for the data-struct.
-	 * Note that as we use calloc for allocating memory, all bytes will be
-	 * set to 0, and therefore we dont have to initialize the attributes.
-	 */
-	if(!(data = calloc(sizeof(struct amo_model), 1)))
-		goto err_close_file;
+	/* Animation-array */
+	size = sizeof(struct amo_anim);
+	amo_arr_init(&arrlst[AMO_ARR_ANI], size);
+
+	/* Keyframe-array */
+	size = sizeof(struct amo_keyfr);
+	amo_arr_init(&arrlst[AMO_ARR_ANI], size);
+
+	/* Collision-mesh-vertex-array*/
+	size = 3 * sizeof(float);
+	amo_arr_init(&arrlst[AMO_ARR_CMV], size);
+
+	/* Collision-mesh-index-array */
+	size = 3 * sizeof(unsigned int);
+	amo_arr_init(&arrlst[AMO_ARR_CMI], size);
+}
+
+/*
+ * Initialize the arrays and read data from the given filedescriptor and write
+ * it to the respective arrays. This function will not perform any
+ * data-validation or completion.
+ *
+ * @fd: A filedescriptor to read data from
+ * @arrlst: An array to write the data to
+ * @name: A buffer to write the model-name to
+ * @attr_m: A pointer to write the attribute-mask to
+ *
+ * Returns: 0 on success or -1 if an error occurred
+ */
+AMO_INTERN int amo_load_file(FILE *fd, struct amo_array *arrlst, 
+		char *name, uint32_t *attr_m)
+{
+	char buf[64];
+	enum amo_format fmt = AMO_FORMAT_NONE;
+	uint32_t mask = AMO_M_NONE;
+	unsigned short size;
 
 	/*
-	 * Search for the format-type.
+	 * Find and read the file-header.
 	 *
-	 * <format-type> <model-name>
+	 * <format-type> <model-name> [<attribute-mask>]
 	 */
 	while(fscanf(fd, "%s", cmd_buf) != EOF) {
 		if(strcmp(cmd_buf, "o") == 0) {
@@ -81,22 +108,24 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		}
 	}
 
-	/*
-	 * If no format-type has been found, then terminate.
-	 */
+	/* Return if no format-type has been found */
 	if(format == AMO_FORMAT_NONE)
 		return NULL;
 
-	/*
-	 * Read the model-name.
-	 */
-	fscanf(fd, "%s", data->name);
+	/* Read the model-name */
+	fscanf(fd, "%s", name);
 
-	/* Read the data-mask */
+	/* Read the data-mask, or use default */
 	if(format == AMO_FORMAT_AMO)
-		fscanf(fd, "%u", &attr_m);
+		fscanf(fd, "%u", &mask);
+	else
+		mask = AMO_M_MDL;
 
-	data->attr_m = attr_m;
+	/*
+	 * Initialize the arrays.
+	 */
+	amo_init_arrs(arrlst, mask);
+
 
 	/* 
 	 * Go through every line and read the first word. If it's a valid amo
@@ -106,345 +135,172 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	while(fscanf(fd, "%s", cmd_buf) != EOF) {
 		/* v <x> <y> <z> */
 		if(strcmp(cmd_buf, "v") == 0) {
-			/* Increment the number of vertices */
-			data->vtx_c++;
-
-			/* Allocate memory if necessary */
-			if(data->vtx_c == 1) {
-				vtx_num = 200;
-				tmp = sizeof(float) * 3 * vtx_num;
-
-				if(!(data->vtx_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->vtx_c > vtx_num) {
-				vtx_num *= 1.5;
-				tmp = sizeof(float) * 3 * vtx_num;
-
-				if(!(p = realloc(data->vtx_buf, tmp)))
-					goto err_free_data;
-
-				data->vtx_buf = p;
-			}
+			float vtx[3];
 
 			/* Read the data of the new vertex */
-			tmp = (data->vtx_c - 1) * 3;
 			fscanf(fd, "%f %f %f",
-					&data->vtx_buf[tmp + 0],
-					&data->vtx_buf[tmp + 1],
-					&data->vtx_buf[tmp + 2]);
+					&vtx[0], &vtx[1], &vtx[2]);
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_VTX], vtx, 1);
 		}
 		/* vt <x> <y> */
 		else if(strcmp(cmd_buf, "vt") == 0) {
-			/* Increment the number of texture-coordinates */
-			data->tex_c++;
-
-			/* Allocate memory if necessary */
-			if(data->tex_c == 1)  {
-				tex_num = 200;
-				tmp = sizeof(float) * 2 * tex_num;
-
-				if(!(data->tex_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->tex_c > tex_num) {
-				tex_num *= 1.5;
-				tmp = sizeof(float) * 2 * tex_num;
-
-				if(!(p = realloc(data->tex_buf, tmp)))
-					goto err_free_data;
-
-				data->tex_buf = p;
-			}
+			float tex[2];
 
 			/* Read the data of the new uv-coordinate */
-			tmp = (data->tex_c - 1) * 2;
 			fscanf(fd, "%f %f",
-					&data->tex_buf[tmp + 0],
-					&data->tex_buf[tmp + 1]);
+					&tex[0], &tex[1]);
 
-			/* Flip uv-coordinates */
-			data->tex_buf[tmp + 1] = 1.0 - data->tex_buf[tmp + 1];
+			/* Flip vertical uv-coordinates */
+			tex[1] = 1.0 - tex[1];
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_TEX], tex, 1);
 		}
 		/* vn <x> <y> <z> */
 		else if(strcmp(cmd_buf, "vn") == 0) {
-			/* Increment the number of normal-vectors */
-			data->nrm_c++;
-
-			/* Allocate memory if necessary */
-			if(data->nrm_c == 1) {
-				nrm_num = 200;
-				tmp = sizeof(float) * 3 * nrm_num;
-
-				if(!(data->nrm_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->nrm_c > nrm_num) {
-				nrm_num *= 1.5;
-				tmp = sizeof(float) * 3 * nrm_num;
-
-				if(!(p = realloc(data->nrm_buf, tmp)))
-					goto err_free_data;
-
-				data->nrm_buf = p;
-			}
+			float nrm[3];
 
 			/* Read the data of the new normal-vector */
-			tmp = (data->nrm_c - 1) * 3;
 			fscanf(fd, "%f %f %f",
-					&data->nrm_buf[tmp + 0],
-					&data->nrm_buf[tmp + 1],
-					&data->nrm_buf[tmp + 2]);
+					&nrm[0], &nrm[1], &nrm[2]);
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_NRM], nrm, 1);
 		}
 		/* vj <joint_1> <joint_2> <joint_3> <joint_4> */
 		else if(strcmp(cmd_buf, "vj") == 0) {
-			/* Increment the number of vertex-joints */
-			data->vjnt_c++;
-
-			/* Allocate memory if necessary */	
-			if(data->vjnt_c == 1) {
-				vjnt_num = 200;
-				tmp = sizeof(int) * 4 * vjnt_num;
-
-				if(!(data->vjnt_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->vjnt_c > vjnt_num) {
-				vjnt_num *= 1.5;
-				tmp = sizeof(int) * 4 * vjnt_num;
-
-				if(!(p = realloc(data->vjnt_buf, tmp)))
-					goto err_free_data;
-
-				data->vjnt_buf = p;
-			}
+			int vjn[4];
 
 			/* Read the data of the vertex-joint */
-			tmp = (data->vjnt_c - 1) * 4;
-			fscanf(fd, "%d %d %d %d",
-					&data->vjnt_buf[tmp + 0],
-					&data->vjnt_buf[tmp + 1],
-					&data->vjnt_buf[tmp + 2],
-					&data->vjnt_buf[tmp + 3]);
+			fscanf(fd, "%d %d %d %d", 
+					&vjn[0], &vjn[1], &vjn[2], &vjn[3]);
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_VJN], vjn, 1);
 		}
 		/* vw <weight_1> <weight_2> <weight_3> <weight_4> */
 		else if(strcmp(cmd_buf, "vw") == 0) {
-			/* Increment the number of joints */
-			data->wgt_c++;
+			float vwg[4];
 
-			/* Allocate memory if necessary */	
-			if(data->wgt_c == 1) {
-				wgt_num = 200;
-				tmp = sizeof(float) * 4 * wgt_num;
-
-				if(!(data->wgt_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->wgt_c > wgt_num) {
-				wgt_num *= 1.5;
-				tmp = sizeof(float) * 4 * wgt_num;
-
-				if(!(p = realloc(data->wgt_buf, tmp)))
-					goto err_free_data;
-
-				data->wgt_buf = p;
-			}
-
-			/* Read the data of the new weight */
-			tmp = (data->wgt_c - 1) * 4;
+			/* Read the data of the new weights */
 			fscanf(fd, "%f %f %f %f",
-					&data->wgt_buf[tmp + 0],
-					&data->wgt_buf[tmp + 1],
-					&data->wgt_buf[tmp + 2],
-					&data->wgt_buf[tmp + 3]);
+					&vwg[0], &vwg[1], &vwg[2], &vwg[3]);
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_VWG], vwg, 1);
 		}
 		/* 
-		 * f <pos>/<tex>/<normal>/<joint>/<weight>
-		 *   <pos>/<tex>/<normal>/<joint>/<weight>
-		 *   <pos>/<tex>/<normal>/<joint>/<weight>
+		 * f <pos>/<tex>/<nrm>[/<joint>/<weight>]
+		 *   <pos>/<tex>/<nrm>[/<joint>/<weight>]
+		 *   <pos>/<tex>/<nrm>[/<joint>/<weight>]
 		 */
 		else if(strcmp(cmd_buf, "f") == 0) {
+			unsigned int idx[5];
 			int num = (attr_m & AMO_M_RIG) ? 5 : 3;
-
-			/* Increment the number of indices */
-			data->idx_c++;
-
-			/* Allocate memory if necessary */	
-			if(data->idx_c == 1) {
-				idx_num = 200;
-				tmp = sizeof(unsigned int) * (3 * num) * idx_num;
-
-				if(!(data->idx_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->idx_c > idx_num) {
-				idx_num *= 1.5;
-				tmp = sizeof(unsigned int) * (3 * num) * idx_num;
-
-				if(!(p = realloc(data->idx_buf, tmp)))
-					goto err_free_data;
-
-				data->idx_buf = p;
-			}
+			int k;
 
 			/* Read the indices in blocks of 3 with 5 each*/
 			for(j = 0; j < 3; j++) {
 				if(attr_m & AMO_M_RIG) {
-					tmp = (data->idx_c - 1) * (3 * num) + (j * num);
 					fscanf(fd, "%u/%u/%u/%u/%u",
-							&data->idx_buf[tmp + 0],
-							&data->idx_buf[tmp + 1],
-							&data->idx_buf[tmp + 2],
-							&data->idx_buf[tmp + 3],
-							&data->idx_buf[tmp + 4]);
+							&idx[0], &idx[1],
+							&idx[2], &idx[3],
+							&idx[4]);
 
-					/* OBJ-indices start counting at 1 */
-					data->idx_buf[tmp + 0] -= 1;
-					data->idx_buf[tmp + 1] -= 1;
-					data->idx_buf[tmp + 2] -= 1;
-					data->idx_buf[tmp + 3] -= 1;
-					data->idx_buf[tmp + 4] -= 1;
 				}
 				else {
-					tmp = ((data->idx_c - 1) * (3 * num)) + (j * num);
 					fscanf(fd, "%u/%u/%u",
-							&data->idx_buf[tmp + 0],
-							&data->idx_buf[tmp + 1],
-							&data->idx_buf[tmp + 2]);
-
-
-					/* OBJ-indices start counting at 1 */
-					data->idx_buf[tmp + 0] -= 1;
-					data->idx_buf[tmp + 1] -= 1;
-					data->idx_buf[tmp + 2] -= 1;
-
+							&idx[0], &idx[1],
+							&idx[2]);
 				}
+
+				/* Decrement by 1, as OBJ indices start at 1 */
+				for(k = 0; k < num; k++)
+					idx[k] -= 1;
 			}
+
+			/* Push into array */
+			amo_arr_push(&arrlst[AMO_ARR_IDX], 1);
 		}
 		/* j <name> <parent> */
 		else if(strcmp(cmd_buf, "j") == 0) {
-			int joint_par;
-			struct amo_joint *joint_tmp;
-
-			/* Increment the number of joints */
-			data->jnt_c++;
-
-			/* Allocate memory if necessary */
-			if(data->jnt_c == 1) {
-				jnt_num = 200;
-				tmp = sizeof(struct amo_joint) * jnt_num;
-
-				if(!(data->jnt_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->jnt_c > jnt_num) {
-				jnt_num *= 1.5;
-				tmp = sizeof(struct amo_joint) * jnt_num;
-
-				if(!(p = realloc(data->jnt_lst, tmp)))
-					goto err_free_data;
-				data->jnt_lst = p;
-			}
+			struct amo_joint jnt;
+			int jnt_par;
 
 			/* Read the data of the new joint */
-			tmp = data->jnt_c - 1;
 			fscanf(fd, "%s %d",
-					data->jnt_lst[tmp].name,
-					&joint_par);
+					jnt.name, &jnt_par);
 
-			for(i = 0; i < 16; i++)
+			/* Read the local base-matrix of this joint */
+			for(i = 0; i < 16; i++) {
 				fscanf(fd, "%f",
-						&data->jnt_lst[tmp].mat[i]);
-
-			/* Special treatment for root joint */
-			if(joint_par == -1) {
-				joint_tmp = NULL;
-			}
-			else {
-				/* Correct the parent-index */
-				joint_par -= 1;
-
-				/* Get reference to parent-joint */
-				joint_tmp = &data->jnt_lst[tmp];
+						&jnt.mat[i]);
 			}
 
-			/* Set the parent-joint */
-			data->jnt_lst[tmp].index = joint_par;
-			data->jnt_lst[tmp].par = joint_tmp;
+			/* Correct parent-index if not root-joint */
+			if(jnt_par > 0) {
+				jnt_par -= 1;
+			}
+
+			/* Set index and parent-joint-index */
+			jnt.idx = arrlst[AMO_ARR_JNT].num;	
+			jnt.par_idx = jnt_par;
+
+			/* Push into the array */
+			amo_arr_push(&arrlst[AMO_ARR_JNT], &jnt, 1);
 		}
 		/* a <name> */
 		else if(strcmp(cmd_buf, "a") == 0) {
-			/* Increment the number of animations */
-			data->ani_c++;
+			struct amo_anim ani;
 
-			/* Allocate memory if necessary */
-			if(data->ani_c == 1) {
-				ani_num = 200;
-				tmp = sizeof(struct amo_anim ) * ani_num;
-
-				if(!(data->ani_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}	
-			else if(data->ani_c > ani_num) {
-				ani_num *= 1.5;
-				tmp = sizeof(struct amo_anim) * ani_num;
-
-				if(!(p = realloc(data->ani_lst, tmp)))
-					goto err_free_data;
-
-				data->ani_lst = p;
-			}
-
-			/*  Set the number of keyframes to 0 */
-			data->ani_lst[data->ani_c - 1].keyfr_c = 0;
+			/* Initialize the keyframe array */
+			amo_arr_init(&ani.keyfr, sizeof(struct amo_keyfr));
 
 			/* Read the data of the animation */
-			tmp = data->ani_c - 1;
 			fscanf(fd, "%s %d",
-					data->ani_lst[tmp].name,
-					&data->ani_lst[tmp].dur);
+					ani.name, &ani.dur);
+
+			
+
+			/* Push into the array */
+			amo_arr_push(&arrlst[AMO_ARR_ANI], &ani, 1);
 		}
 		/* k <timestamp> */
 		else if(strcmp(cmd_buf, "k") == 0) {
-			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
+			int num = (arrlst[AMO_ARR_ANI].num - 1);
+			int off = num * sizeof(struct amo_anim);
+			struct amo_anim *ani = (struct amo_anim *)&arrlst[AMO_ARR_ANI].buf[off];
 
-			ani->keyfr_c++;
+			struct amo_keyfr keyfr;
 
-			/* Allocate memory if necessary */
-			if(ani->keyfr_c == 1) {
-				keyfr_num = 20;
-				tmp = sizeof(struct amo_keyfr) * keyfr_num;
 
-				if(!(ani->keyfr_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}	
-			else if(ani->keyfr_c > keyfr_num) {
-				keyfr_num *= 1.5;
-				tmp = sizeof(struct amo_keyfr) * keyfr_num;
-
-				if(!(p = realloc(ani->keyfr_lst, tmp)))
-					goto err_free_data;
-
-				ani->keyfr_lst = p;
-			}
-
-			/* Allocate memory for all bones in the keyframe */
 			tmp = data->jnt_c * sizeof(struct amo_joint);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].joints = malloc(tmp)))
+			if(!(keyfr.joints = malloc(tmp)))
 				goto err_free_data;
 
 			tmp = data->jnt_c * 3 * sizeof(float);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].pos = malloc(tmp)))
+			if(!(keyfr.pos = malloc(tmp))) {
+				free(keyfr.joints);
 				goto err_free_data;
+			}
 
 			tmp = data->jnt_c * 4 * sizeof(float);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].rot = malloc(tmp)))
+			if(!(keyfr.rot = malloc(tmp))) {
+				free(keyfr.joints);
+				free(keyfr.pos);
 				goto err_free_data;
+			}
+
 
 			/* Read the data of the keyframe */
 			tmp = ani->keyfr_c - 1;
 			fscanf(fd, "%f",
-					&ani->keyfr_lst[tmp].prog);
+					&keyfr.prog);
+
+			/* Push into the array */
+			amo_arr_push(&ani->keyfr, &keyfr, 1);
 		}
 		/* ap <joint> <x> <y> <z> */
 		else if(strcmp(cmd_buf, "ap") == 0) {
@@ -582,6 +438,46 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		}
 	}
 
+
+}
+
+AMO_API struct amo_model *amo_load(const char *pth)
+{
+	int i;
+	int j;
+	int tmp;
+	void *p;
+
+	FILE *fd;
+	struct amo_model *data;
+
+	char cmd_buf[128];
+	enum amo_format format = AMO_FORMAT_NONE;
+	uint32_t attr_m = AMO_M_NONE;
+
+	struct amo_array arrlst[11];
+
+	/* Check if file is has the right extension */
+	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
+		;
+	else if(strcmp(strrchr(pth, '.'), ".obj") == 0)
+		;
+	else
+		return NULL;
+
+	/* Try to open the file */
+	if(!(fd = fopen(pth, "r")))
+		return NULL;
+
+	/* 
+	 * Allocate memory for the data-struct.
+	 * Note that as we use calloc for allocating memory, all bytes will be
+	 * set to 0, and therefore we dont have to initialize the attributes.
+	 */
+	if(!(data = calloc(sizeof(struct amo_model), 1)))
+		goto err_close_file;
+
+	
 	/* 
 	 * Resize the arrays to make them fit their contents.
 	 */
