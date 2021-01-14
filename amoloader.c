@@ -351,11 +351,12 @@ AMO_API struct amo_model *amo_load(const char *pth)
 				joint_par -= 1;
 
 				/* Get reference to parent-joint */
-				joint_tmp = &data->jnt_lst[tmp];
+				joint_tmp = &data->jnt_lst[joint_par];
 			}
 
+			/* TODO */
 			/* Set the parent-joint */
-			data->jnt_lst[tmp].index = joint_par;
+			data->jnt_lst[tmp].index = tmp;
 			data->jnt_lst[tmp].par = joint_tmp;
 		}
 		/* a <name> */
