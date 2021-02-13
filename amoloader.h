@@ -24,11 +24,12 @@
 #ifndef _AMOLOADER_H
 #define _AMOLOADER_H
 
-#include "define.h"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#define AMO_API extern
+#define AMO_INTERN static
 
 /*
  * The different data-formats specifying which data is contained in the returned
@@ -79,7 +80,11 @@ struct amo_joint {
 struct amo_keyfr {
 	float prog;
 
-	struct amo_joint  **joints;
+	int jnt_num;
+
+	struct amo_joint **joints;
+
+	short             *jnt;
 	float             *pos;
 	float             *rot;
 };
@@ -187,8 +192,8 @@ struct amo_model {
  * 
  * @pth: The file path to the dot-amo file
  * 
- * Returns: Returns the array containing the models read from the given dot-amo
- *          file
+ * Returns: Returns a buffer containing the model-data read from the given
+ *          dot-amo file
  */
 AMO_API struct amo_model *amo_load(const char *pth);
 

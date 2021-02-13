@@ -394,6 +394,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 		/* k <timestamp> */
 		else if(strcmp(cmd_buf, "k") == 0) {
 			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
+			short jnt_num;
 
 			ani->keyfr_c++;
 
@@ -415,29 +416,41 @@ AMO_API struct amo_model *amo_load(const char *pth)
 				ani->keyfr_lst = p;
 			}
 
+			/* Read the data of the keyframe */
+			tmp = ani->keyfr_c - 1;
+			fscanf(fd, "%f %d",
+					&ani->keyfr_lst[tmp].prog,
+					&ani->keyfr_lst[tmp].jnt_num);
+
+			jnt_num = ani->keyfr_lst[tmp].jnt_num;
+
 			/* Allocate memory for all bones in the keyframe */
-			tmp = data->jnt_c * sizeof(struct amo_joint);
+			tmp = jnt_num * sizeof(struct amo_joint *);
 			if(!(ani->keyfr_lst[ani->keyfr_c - 1].joints = malloc(tmp)))
 				goto err_free_data;
 
-			tmp = data->jnt_c * 3 * sizeof(float);
+			tmp = jnt_num * sizeof(short);
+			if(!(ani->keyfr_lst[ani->keyfr_c - 1].jnt = malloc(tmp)))
+				goto err_free_data;
+
+			for(i = 0; i < jnt_num; i++)
+				ani->keyfr_lst[ani->keyfr_c - 1].jnt[i] = -1;
+
+			tmp = jnt_num * 3 * sizeof(float);
 			if(!(ani->keyfr_lst[ani->keyfr_c - 1].pos = malloc(tmp)))
 				goto err_free_data;
 
-			tmp = data->jnt_c * 4 * sizeof(float);
+			tmp = jnt_num * 4 * sizeof(float);
 			if(!(ani->keyfr_lst[ani->keyfr_c - 1].rot = malloc(tmp)))
 				goto err_free_data;
-
-			/* Read the data of the keyframe */
-			tmp = ani->keyfr_c - 1;
-			fscanf(fd, "%f",
-					&ani->keyfr_lst[tmp].prog);
 		}
 		/* ap <joint> <x> <y> <z> */
 		else if(strcmp(cmd_buf, "ap") == 0) {
 			int joint;
 			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
 			struct amo_keyfr *keyfr;
+			int x;
+			int found = -1;
 
 			/* Get a pointer to the keyframe */
 			tmp = ani->keyfr_c - 1;
@@ -446,12 +459,32 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			/* Read the data of the position-keyframe */
 			fscanf(fd, "%d",
 					&joint);
+		
+			/* Indices start at 1 */
+			joint -= 1;
+
+			/* Either search for the joint-slot or a free-slot */
+			for(x = 0; x < keyfr->jnt_num; x++) {
+				if(keyfr->jnt[x] == joint) {
+					found = x;
+					break;
+				}
+				if(keyfr->jnt[x] == -1) {
+					found = x;
+
+					/* Claim free slot for joint  */
+					keyfr->jnt[x] = joint;
+
+					break;
+				}
+			}
+
 
 			/* Set a pointer to the referenced joint */
-			keyfr->joints[joint - 1] = &data->jnt_lst[joint - 1];
+			keyfr->joints[found] = &data->jnt_lst[joint];
 
 			/* Read the rest of the position-keyframe */
-			tmp = (joint - 1) * 3;
+			tmp = found * 3;
 			fscanf(fd, "%f %f %f",
 					&keyfr->pos[tmp + 0],
 					&keyfr->pos[tmp + 1],
@@ -462,6 +495,8 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			int joint;
 			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
 			struct amo_keyfr *keyfr;
+			int x;
+			int found = -1;
 
 			/* Get a pointer to the keyframe */
 			tmp = ani->keyfr_c - 1;
@@ -471,11 +506,30 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			fscanf(fd, "%d",
 					&joint);
 
+			/* Indices start at 1 */
+			joint -= 1;
+
+			/* Either search for the joint-slot or a free-slot */
+			for(x = 0; x < keyfr->jnt_num; x++) {
+				if(keyfr->jnt[x] == joint) {
+					found = x;
+					break;
+				}
+				else if(keyfr->jnt[x] == -1) {
+					found = x;
+
+					/* Claim free slot for joint  */
+					keyfr->jnt[x] = joint;
+
+					break;
+				}
+			}
+
 			/* Set a pointer to the referenced joint */
-			keyfr->joints[joint - 1] = &data->jnt_lst[joint - 1];
+			keyfr->joints[found] = &data->jnt_lst[joint];
 
 			/* Read the rest of the position-keyframe */
-			tmp = (joint - 1) * 4;
+			tmp = found * 4;
 			fscanf(fd, "%f %f %f %f",
 					&keyfr->rot[tmp + 0],
 					&keyfr->rot[tmp + 1],
