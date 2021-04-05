@@ -537,14 +537,14 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					&keyfr->rot[tmp + 3]);
 		}
 		/* bp <x> <y> <z> <sx> <sy> <sz> */
-		else if(strcmp(cmd_buf, "bp") == 0) {
+		else if(strcmp(cmd_buf, "bb") == 0) {
 			fscanf(fd, "%f %f %f %f %f %f",
-					&data->bp_col.pos[0],
-					&data->bp_col.pos[1],
-					&data->bp_col.pos[2],
-					&data->bp_col.scl[0],
-					&data->bp_col.scl[1],
-					&data->bp_col.scl[2]);
+					&data->bb_col.pos[0],
+					&data->bb_col.pos[1],
+					&data->bb_col.pos[2],
+					&data->bb_col.scl[0],
+					&data->bb_col.scl[1],
+					&data->bb_col.scl[2]);
 		}
 		/* ne <x> <y> <z> <sx> <sy> <sz> */
 		else if(strcmp(cmd_buf, "ne") == 0) {

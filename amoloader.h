@@ -177,7 +177,7 @@ struct amo_model {
 	 * collision-buffers 
 	 */
 
-	struct amo_shape3d  bp_col;
+	struct amo_shape3d  bb_col;
 	struct amo_shape3d  ne_col;
 
 	int                 cm_vtx_c;
