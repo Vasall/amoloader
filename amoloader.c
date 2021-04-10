@@ -30,6 +30,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	int idx_num =     200;
 	int cm_vtx_num =  200;
 	int cm_idx_num =  200;
+	int rb_num =       20;
 
 	/* Check if file is has the right extension */
 	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
@@ -338,6 +339,7 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					data->jnt_lst[tmp].name,
 					&joint_par);
 
+			/* Read the rest-bone-matrix */
 			for(i = 0; i < 16; i++)
 				fscanf(fd, "%f",
 						&data->jnt_lst[tmp].mat[i]);
@@ -621,6 +623,84 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			data->cm_idx_buf[tmp + 1] -= 1;
 			data->cm_idx_buf[tmp + 2] -= 1;
 		}
+		/* ci <jnt> <pos> <scl> <mat> */
+		else if(strcmp(cmd_buf, "rb") == 0) {
+			/* Increment the number of rig-boxes */
+			data->rb_c++;
+
+			/* Allocate memory if necessary */
+			if(data->rb_c == 1) {
+				rb_num = 20;
+
+				tmp = sizeof(int) * rb_num;
+				if(!(data->rb_jnt = calloc(1, tmp)))
+					goto err_free_data;
+
+				tmp = sizeof(float) * 3 * rb_num;
+				if(!(data->rb_pos = calloc(1, tmp)))
+					goto err_free_data;
+
+				tmp = sizeof(float) * 3 * rb_num;
+				if(!(data->rb_scl = calloc(1, tmp)))
+					goto err_free_data;
+
+				tmp = sizeof(float) * 16 * rb_num;
+				if(!(data->rb_mat = calloc(1, tmp)))
+					goto err_free_data;
+			}
+			else if(data->rb_c > rb_num) {
+				rb_num *= 1.5;
+
+				tmp = sizeof(int) * rb_num;
+				if(!(p = realloc(data->rb_jnt, tmp)))
+					goto err_free_data;
+				data->rb_jnt = p;
+
+				tmp = sizeof(float) * 3 * rb_num;
+				if(!(p = realloc(data->rb_pos, tmp)))
+					goto err_free_data;
+				data->rb_pos = p;
+
+				tmp = sizeof(float) * 3 * rb_num;
+				if(!(p = realloc(data->rb_scl, tmp)))
+					goto err_free_data;
+				data->rb_scl = p;
+
+				tmp = sizeof(float) * 16 * rb_num;
+				if(!(p = realloc(data->rb_mat, tmp)))
+					goto err_free_data;
+				data->rb_mat = p;
+			}
+
+			/* Read the parent-joint-index */
+			tmp = data->rb_c - 1;
+			fscanf(fd, "%d",
+					&data->rb_jnt[tmp]);
+
+			/* Indices start at one, so decerement by 1 */
+			data->rb_jnt[tmp] -= 1;
+
+			/* Read the position of the rig-box */
+			tmp = (data->rb_c - 1) * 3;
+			fscanf(fd, "%f %f %f",
+					&data->rb_pos[tmp + 0],
+					&data->rb_pos[tmp + 1],
+					&data->rb_pos[tmp + 2]);
+
+			/* Read the scale of the rig-box */
+			tmp = (data->rb_c - 1) * 3;
+			fscanf(fd, "%f %f %f",
+					&data->rb_scl[tmp + 0],
+					&data->rb_scl[tmp + 1],
+					&data->rb_scl[tmp + 2]);
+
+			/* Read the transformation-matrix of the box */
+			tmp = (data->rb_c - 1) * 16;
+			for(i = 0; i < 16; i++) {
+				fscanf(fd, "%f",
+						&data->rb_mat[tmp + i]);
+			}
+		}
 	}
 
 	/* 
@@ -630,35 +710,40 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	/* vertex-buffer */
 	if(data->vtx_c > 0) {
 		tmp = data->vtx_c * 3 * sizeof(float);
-		if(!(p = realloc(data->vtx_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->vtx_buf, tmp)))
+			goto err_free_data;
 		data->vtx_buf = p;
 	}
 
 	/* texture-buffer */
 	if(data->tex_c > 0) {
 		tmp = data->tex_c * 2 * sizeof(float);
-		if(!(p = realloc(data->tex_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->tex_buf, tmp)))
+			goto err_free_data;
 		data->tex_buf = p;
 	}
 
 	/* normal-buffer */
 	if(data->nrm_c > 0) {
 		tmp = data->nrm_c * 3 * sizeof(float);
-		if(!(p = realloc(data->nrm_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->nrm_buf, tmp)))
+			goto err_free_data;
 		data->nrm_buf = p;
 	}
 
 	/* vertex-joint-buffer */
 	if(data->vjnt_c > 0) {
 		tmp = data->vjnt_c * 4 * sizeof(int);
-		if(!(p = realloc(data->vjnt_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->vjnt_buf, tmp)))
+			goto err_free_data;
 		data->vjnt_buf = p;
 	}
 
 	/* weight-buffer */
 	if(data->wgt_c > 0) {
 		tmp = data->wgt_c * 4 * sizeof(float);
-		if(!(p = realloc(data->wgt_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->wgt_buf, tmp)))
+			goto err_free_data;
 		data->wgt_buf = p;
 	}
 
@@ -666,28 +751,32 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	if(data->idx_c > 0) {
 		tmp = (attr_m & AMO_M_RIG) ? 5 : 3;
 		tmp = data->idx_c * 3 * tmp * sizeof(unsigned int);
-		if(!(p = realloc(data->idx_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->idx_buf, tmp)))
+			goto err_free_data;
 		data->idx_buf = p;
 	}
 
 	/* joint-list */
 	if(data->jnt_c > 0) {
 		tmp = data->jnt_c * sizeof(struct amo_joint);
-		if(!(p = realloc(data->jnt_lst, tmp))) goto err_free_data;
+		if(!(p = realloc(data->jnt_lst, tmp)))
+			goto err_free_data;
 		data->jnt_lst = p;
 	}
 
 	/* animation-list */
 	if(data->ani_c > 0) {
 		tmp = data->ani_c * sizeof(struct amo_anim);
-		if(!(p = realloc(data->ani_lst, tmp))) goto err_free_data;
+		if(!(p = realloc(data->ani_lst, tmp)))
+			goto err_free_data;
 		data->ani_lst = p;
 
 		for(i = 0; i < data->ani_c; i++) {
 			struct amo_anim *ani = &data->ani_lst[i];
 	
 			tmp = ani->keyfr_c * sizeof(struct amo_keyfr);
-			if(!(p = realloc(ani->keyfr_lst, tmp))) goto err_free_data;
+			if(!(p = realloc(ani->keyfr_lst, tmp)))
+				goto err_free_data;
 			ani->keyfr_lst = p;
 		}
 	}
@@ -695,15 +784,40 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	/* collision-vertex-buffer */
 	if(data->cm_vtx_c > 0) {
 		tmp = data->cm_vtx_c * 3 * sizeof(float);
-		if(!(p = realloc(data->cm_vtx_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->cm_vtx_buf, tmp)))
+			goto err_free_data;
 		data->cm_vtx_buf = p;
 	}
 
 	/* collision-index-buffer */
 	if(data->cm_idx_c > 0) {
 		tmp = data->cm_idx_c * 3 * sizeof(int);
-		if(!(p = realloc(data->cm_idx_buf, tmp))) goto err_free_data;
+		if(!(p = realloc(data->cm_idx_buf, tmp)))
+			goto err_free_data;
 		data->cm_idx_buf = p;
+	}
+
+	/* collision-rig-boxes */
+	if(data->rb_c > 0) {
+		tmp = data->rb_c * sizeof(int);
+		if(!(p = realloc(data->rb_jnt, tmp)))
+			goto err_free_data;
+		data->rb_jnt = p;
+
+		tmp = data->rb_c * 3 * sizeof(float);
+		if(!(p = realloc(data->rb_pos, tmp)))
+			goto err_free_data;
+		data->rb_pos = p;
+
+		tmp = data->rb_c * 3 * sizeof(float);
+		if(!(p = realloc(data->rb_scl, tmp)))
+			goto err_free_data;
+		data->rb_scl = p;
+
+		tmp = data->rb_c * 16 * sizeof(float);
+		if(!(p = realloc(data->rb_mat, tmp)))
+			goto err_free_data;
+		data->rb_mat = p;
 	}
 
 	/* Close the file */
@@ -751,6 +865,19 @@ AMO_API void amo_destroy(struct amo_model *data)
 		}
 
 		free(data->ani_lst);
+	}
+
+	if(data->cm_vtx_c > 0) {
+		free(data->cm_vtx_buf);
+		free(data->cm_idx_buf);
+		free(data->cm_nrm_buf);
+	}
+
+	if(data->rb_c > 0) {
+		free(data->rb_jnt);
+		free(data->rb_pos);
+		free(data->rb_scl);
+		free(data->rb_mat);
 	}
 
 	free(data);

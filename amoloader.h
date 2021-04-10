@@ -185,6 +185,12 @@ struct amo_model {
 	int                 cm_idx_c;
 	int                 *cm_idx_buf;
 	float               *cm_nrm_buf;
+
+	int                 rb_c;
+	int                 *rb_jnt;
+	float               *rb_pos;
+	float               *rb_scl;
+	float               *rb_mat;
 };
 
 /*
