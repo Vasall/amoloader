@@ -5,17 +5,16 @@
 
 
 
-AMO_API struct amo_model *amo_load(const char *pth)
+AMO_API struct amo_model *amo_load(FILE *fd)
 {
 	int i;
 	int j;
 	int tmp;
 	void *p;
 
-	FILE *fd;
 	struct amo_model *data;
 
-	char cmd_buf[128];
+	char cmd_buf[48];
 	enum amo_format format = AMO_FORMAT_NONE;
 	uint32_t attr_m = AMO_M_NONE;
 
@@ -28,20 +27,13 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	int ani_num =     200;
 	int keyfr_num =    20;
 	int idx_num =     200;
+	int hh_num =       20;
 	int cm_vtx_num =  200;
 	int cm_idx_num =  200;
 	int rb_num =       20;
 
-	/* Check if file is has the right extension */
-	if(strcmp(strrchr(pth, '.'), ".amo") == 0)
-		;
-	else if(strcmp(strrchr(pth, '.'), ".obj") == 0)
-		;
-	else
-		return NULL;
-
-	/* Try to open the file */
-	if(!(fd = fopen(pth, "r")))
+	/* Verify the passed filedescriptor is valid */
+	if(fd == NULL)
 		return NULL;
 
 	/* 
@@ -91,6 +83,9 @@ AMO_API struct amo_model *amo_load(const char *pth)
 	 * the data struct.
 	 */
 	while(fscanf(fd, "%s", cmd_buf) != EOF) {
+		if(strcmp(cmd_buf, "end") == 0)
+			break;
+
 		/* v <x> <y> <z> */
 		if(strcmp(cmd_buf, "v") == 0) {
 			/* Increment the number of vertices */
@@ -538,6 +533,50 @@ AMO_API struct amo_model *amo_load(const char *pth)
 					&keyfr->rot[tmp + 2],
 					&keyfr->rot[tmp + 3]);
 		}
+		/* hh <idx> <par_jnt> <pos> */
+		else if(strcmp(cmd_buf, "hh") == 0) {
+			struct amo_hook *hook;
+
+			data->hh_c++;
+
+			/* Allocate memory if necessary */
+			if(data->hh_c == 1) {
+				hh_num = 20;
+
+				tmp = sizeof(struct amo_hook) * hh_num;
+				if(!(data->hh_lst = calloc(1, tmp)))
+					goto err_free_data;
+			}	
+			else if(data->hh_c > hh_num) {
+				hh_num *= 1.5;
+				tmp = sizeof(struct amo_hook) * hh_num;
+
+				if(!(p = realloc(data->hh_lst, tmp)))
+					goto err_free_data;
+
+				data->hh_lst = p;
+			}
+
+			hook = &data->hh_lst[data->hh_c - 1];
+
+			/* Read the hook-index */
+			fscanf(fd, "%hd",
+					&hook->idx);
+
+			hook->idx -= 1;
+
+			/* Read the parent-joint-index */
+			fscanf(fd, "%hd",
+					&hook->par_jnt);
+
+			hook->par_jnt -= 1;
+
+			/* Read the hook-position */
+			fscanf(fd, "%f %f %f",
+					&hook->pos[0],
+					&hook->pos[1],
+					&hook->pos[2]);
+		}
 		/* bp <x> <y> <z> <sx> <sy> <sz> */
 		else if(strcmp(cmd_buf, "bb") == 0) {
 			fscanf(fd, "%f %f %f %f %f %f",
@@ -819,9 +858,6 @@ AMO_API struct amo_model *amo_load(const char *pth)
 			goto err_free_data;
 		data->rb_mat = p;
 	}
-
-	/* Close the file */
-	fclose(fd);
 
 	/* Return the data */
 	return data;
