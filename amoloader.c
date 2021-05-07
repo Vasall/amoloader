@@ -4,33 +4,19 @@
 #include <stdint.h>
 
 
-
 AMO_API struct amo_model *amo_load(FILE *fd)
 {
 	int i;
 	int j;
 	int tmp;
-	void *p;
 
 	struct amo_model *data;
 
-	char cmd_buf[48];
-	enum amo_format format = AMO_FORMAT_NONE;
-	uint32_t attr_m = AMO_M_NONE;
+	char opbuf[48];
+	char check = 0;
 
-	int vtx_num =     200;
-	int tex_num  =    200;
-	int nrm_num =     200;
-	int vjnt_num =    200;
-	int wgt_num =     200;
-	int jnt_num =     200;
-	int ani_num =     200;
-	int keyfr_num =    20;
-	int idx_num =     200;
-	int hh_num =       20;
-	int cm_vtx_num =  200;
-	int cm_idx_num =  200;
-	int rb_num =       20;
+	int ani_itr = -1;
+	int keyfr_itr = -1;
 
 	/* Verify the passed filedescriptor is valid */
 	if(fd == NULL)
@@ -44,18 +30,32 @@ AMO_API struct amo_model *amo_load(FILE *fd)
 	if(!(data = calloc(sizeof(struct amo_model), 1)))
 		goto err_close_file;
 
+	/* Reset the buffers */
+	data->vtx_buf = NULL;
+	data->tex_buf = NULL;
+	data->nrm_buf = NULL;
+	data->vjnt_buf = NULL;
+	data->wgt_buf = NULL;
+	data->idx_buf = NULL;
+	data->jnt_lst = NULL;
+	data->ani_lst = NULL;
+	data->hk_lst = NULL;
+	data->cm_vtx_buf = NULL;
+	data->cm_idx_buf = NULL;
+	data->cm_nrm_buf = NULL;
+	data->rb_jnt = NULL;
+	data->rb_pos = NULL;
+	data->rb_scl = NULL;
+	data->rb_mat = NULL;
+
 	/*
 	 * Search for the format-type.
 	 *
 	 * <format-type> <model-name>
 	 */
-	while(fscanf(fd, "%s", cmd_buf) != EOF) {
-		if(strcmp(cmd_buf, "o") == 0) {
-			format = AMO_FORMAT_OBJ;
-			break;
-		}
-		else if(strcmp(cmd_buf, "ao") == 0) {
-			format = AMO_FORMAT_AMO;
+	while(fscanf(fd, "%s", opbuf) != EOF) {
+		if(strcmp(opbuf, "ao") == 0) {
+			check = 1;
 			break;
 		}
 	}
@@ -63,7 +63,7 @@ AMO_API struct amo_model *amo_load(FILE *fd)
 	/*
 	 * If no format-type has been found, then terminate.
 	 */
-	if(format == AMO_FORMAT_NONE)
+	if(check == 0)
 		return NULL;
 
 	/*
@@ -72,513 +72,330 @@ AMO_API struct amo_model *amo_load(FILE *fd)
 	fscanf(fd, "%s", data->name);
 
 	/* Read the data-mask */
-	if(format == AMO_FORMAT_AMO)
-		fscanf(fd, "%u", &attr_m);
-
-	data->attr_m = attr_m;
+	fscanf(fd, "%u", &data->attr_m);
 
 	/* 
 	 * Go through every line and read the first word. If it's a valid amo
 	 * keyword read the arguments and put them into the right position in
 	 * the data struct.
 	 */
-	while(fscanf(fd, "%s", cmd_buf) != EOF) {
-		if(strcmp(cmd_buf, "end") == 0)
+	while(fscanf(fd, "%s", opbuf) != EOF) {
+		if(strcmp(opbuf, "end") == 0)
 			break;
 
 		/* v <x> <y> <z> */
-		if(strcmp(cmd_buf, "v") == 0) {
-			/* Increment the number of vertices */
-			data->vtx_c++;
+		if(strcmp(opbuf, "v") == 0) {
+			/* Read the number of vertices */
+			fscanf(fd, "%d", &data->vtx_c);
 
-			/* Allocate memory if necessary */
-			if(data->vtx_c == 1) {
-				vtx_num = 200;
-				tmp = sizeof(float) * 3 * vtx_num;
+			/* Allocate memory */
+			tmp = sizeof(float) * 3 * data->vtx_c;
+			if(!(data->vtx_buf = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->vtx_buf = calloc(1, tmp)))
-					goto err_free_data;
+			/* Read the data of the vertices */
+			for(i = 0; i < data->vtx_c; i++) {
+				tmp = i * 3;
+				fscanf(fd, "%f %f %f",
+						&data->vtx_buf[tmp + 0],
+						&data->vtx_buf[tmp + 1],
+						&data->vtx_buf[tmp + 2]);
 			}
-			else if(data->vtx_c > vtx_num) {
-				vtx_num *= 1.5;
-				tmp = sizeof(float) * 3 * vtx_num;
-
-				if(!(p = realloc(data->vtx_buf, tmp)))
-					goto err_free_data;
-
-				data->vtx_buf = p;
-			}
-
-			/* Read the data of the new vertex */
-			tmp = (data->vtx_c - 1) * 3;
-			fscanf(fd, "%f %f %f",
-					&data->vtx_buf[tmp + 0],
-					&data->vtx_buf[tmp + 1],
-					&data->vtx_buf[tmp + 2]);
 		}
 		/* vt <x> <y> */
-		else if(strcmp(cmd_buf, "vt") == 0) {
-			/* Increment the number of texture-coordinates */
-			data->tex_c++;
-
-			/* Allocate memory if necessary */
-			if(data->tex_c == 1)  {
-				tex_num = 200;
-				tmp = sizeof(float) * 2 * tex_num;
-
-				if(!(data->tex_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->tex_c > tex_num) {
-				tex_num *= 1.5;
-				tmp = sizeof(float) * 2 * tex_num;
-
-				if(!(p = realloc(data->tex_buf, tmp)))
-					goto err_free_data;
-
-				data->tex_buf = p;
-			}
+		else if(strcmp(opbuf, "vt") == 0) {
+			/* Read the number of texture-coordinates */
+			fscanf(fd, "%d", &data->tex_c);
+			
+			/* Allocate memory */
+			tmp = sizeof(float) * 2 * data->tex_c;
+			if(!(data->tex_buf = malloc(tmp)))
+				goto err_free_data;
 
 			/* Read the data of the new uv-coordinate */
-			tmp = (data->tex_c - 1) * 2;
-			fscanf(fd, "%f %f",
-					&data->tex_buf[tmp + 0],
-					&data->tex_buf[tmp + 1]);
+			for(i = 0; i < data->tex_c; i++) {
+				tmp = i * 2;
+				fscanf(fd, "%f %f",
+						&data->tex_buf[tmp + 0],
+						&data->tex_buf[tmp + 1]);
 
-			/* Flip uv-coordinates */
-			data->tex_buf[tmp + 1] = 1.0 - data->tex_buf[tmp + 1];
+				/* Flip uv-coordinates */
+				data->tex_buf[tmp + 1] = 1.0 -
+					data->tex_buf[tmp + 1];
+			}
 		}
 		/* vn <x> <y> <z> */
-		else if(strcmp(cmd_buf, "vn") == 0) {
+		else if(strcmp(opbuf, "vn") == 0) {
 			/* Increment the number of normal-vectors */
-			data->nrm_c++;
+			fscanf(fd, "%d", &data->nrm_c);
 
-			/* Allocate memory if necessary */
-			if(data->nrm_c == 1) {
-				nrm_num = 200;
-				tmp = sizeof(float) * 3 * nrm_num;
+			/* Allocate memory */
+			tmp = sizeof(float) * 3 * data->nrm_c;
+			if(!(data->nrm_buf = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->nrm_buf = calloc(1, tmp)))
-					goto err_free_data;
+			/* Read the data of the new normal-vectors */
+			for(i = 0; i < data->nrm_c; i++) {
+				tmp = i * 3;
+				fscanf(fd, "%f %f %f",
+						&data->nrm_buf[tmp + 0],
+						&data->nrm_buf[tmp + 1],
+						&data->nrm_buf[tmp + 2]);
 			}
-			else if(data->nrm_c > nrm_num) {
-				nrm_num *= 1.5;
-				tmp = sizeof(float) * 3 * nrm_num;
-
-				if(!(p = realloc(data->nrm_buf, tmp)))
-					goto err_free_data;
-
-				data->nrm_buf = p;
-			}
-
-			/* Read the data of the new normal-vector */
-			tmp = (data->nrm_c - 1) * 3;
-			fscanf(fd, "%f %f %f",
-					&data->nrm_buf[tmp + 0],
-					&data->nrm_buf[tmp + 1],
-					&data->nrm_buf[tmp + 2]);
 		}
 		/* vj <joint_1> <joint_2> <joint_3> <joint_4> */
-		else if(strcmp(cmd_buf, "vj") == 0) {
-			/* Increment the number of vertex-joints */
-			data->vjnt_c++;
+		else if(strcmp(opbuf, "vj") == 0) {
+			/* Read the number of vertex-joints */
+			fscanf(fd, "%d", &data->vjnt_c);
 
-			/* Allocate memory if necessary */	
-			if(data->vjnt_c == 1) {
-				vjnt_num = 200;
-				tmp = sizeof(int) * 4 * vjnt_num;
+			/* Allocate memory */
+			tmp = sizeof(int) * 4 * data->vjnt_c;
+			if(!(data->vjnt_buf = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->vjnt_buf = calloc(1, tmp)))
-					goto err_free_data;
+			/* Read the data of the vertex-joints */
+			for(i = 0; i < data->vjnt_c; i++) {
+				tmp = i * 4;
+				fscanf(fd, "%d %d %d %d",
+						&data->vjnt_buf[tmp + 0],
+						&data->vjnt_buf[tmp + 1],
+						&data->vjnt_buf[tmp + 2],
+						&data->vjnt_buf[tmp + 3]);
 			}
-			else if(data->vjnt_c > vjnt_num) {
-				vjnt_num *= 1.5;
-				tmp = sizeof(int) * 4 * vjnt_num;
-
-				if(!(p = realloc(data->vjnt_buf, tmp)))
-					goto err_free_data;
-
-				data->vjnt_buf = p;
-			}
-
-			/* Read the data of the vertex-joint */
-			tmp = (data->vjnt_c - 1) * 4;
-			fscanf(fd, "%d %d %d %d",
-					&data->vjnt_buf[tmp + 0],
-					&data->vjnt_buf[tmp + 1],
-					&data->vjnt_buf[tmp + 2],
-					&data->vjnt_buf[tmp + 3]);
 		}
 		/* vw <weight_1> <weight_2> <weight_3> <weight_4> */
-		else if(strcmp(cmd_buf, "vw") == 0) {
-			/* Increment the number of joints */
-			data->wgt_c++;
+		else if(strcmp(opbuf, "vw") == 0) {
+			/* Read the number of joints */
+			fscanf(fd, "%d", &data->wgt_c);
+				
+			/* Allocate memory */
+			tmp = sizeof(float) * 4 * data->wgt_c;
+			if(!(data->wgt_buf = malloc(tmp)))
+				goto err_free_data;
 
-			/* Allocate memory if necessary */	
-			if(data->wgt_c == 1) {
-				wgt_num = 200;
-				tmp = sizeof(float) * 4 * wgt_num;
-
-				if(!(data->wgt_buf = calloc(1, tmp)))
-					goto err_free_data;
+			/* Read the data of the new weights */
+			for(i = 0; i < data->wgt_c; i++) {
+				tmp = i * 4;
+				fscanf(fd, "%f %f %f %f",
+						&data->wgt_buf[tmp + 0],
+						&data->wgt_buf[tmp + 1],
+						&data->wgt_buf[tmp + 2],
+						&data->wgt_buf[tmp + 3]);
 			}
-			else if(data->wgt_c > wgt_num) {
-				wgt_num *= 1.5;
-				tmp = sizeof(float) * 4 * wgt_num;
-
-				if(!(p = realloc(data->wgt_buf, tmp)))
-					goto err_free_data;
-
-				data->wgt_buf = p;
-			}
-
-			/* Read the data of the new weight */
-			tmp = (data->wgt_c - 1) * 4;
-			fscanf(fd, "%f %f %f %f",
-					&data->wgt_buf[tmp + 0],
-					&data->wgt_buf[tmp + 1],
-					&data->wgt_buf[tmp + 2],
-					&data->wgt_buf[tmp + 3]);
 		}
 		/* 
 		 * f <pos>/<tex>/<normal>/<joint>/<weight>
 		 *   <pos>/<tex>/<normal>/<joint>/<weight>
 		 *   <pos>/<tex>/<normal>/<joint>/<weight>
 		 */
-		else if(strcmp(cmd_buf, "f") == 0) {
-			int num = (attr_m & AMO_M_RIG) ? 5 : 3;
+		else if(strcmp(opbuf, "f") == 0) {
+			int num = (data->attr_m & AMO_M_RIG) ? 5 : 3;
 
-			/* Increment the number of indices */
-			data->idx_c++;
+			/* Read the number of index-blocks */
+			fscanf(fd, "%d", &data->idx_c);
 
-			/* Allocate memory if necessary */	
-			if(data->idx_c == 1) {
-				idx_num = 200;
-				tmp = sizeof(unsigned int) * (3 * num) * idx_num;
+			/* Allocate memory */
+			tmp = sizeof(unsigned int) * (3 * num) * data->idx_c;
+			if(!(data->idx_buf = calloc(1, tmp)))
+				goto err_free_data;
 
-				if(!(data->idx_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->idx_c > idx_num) {
-				idx_num *= 1.5;
-				tmp = sizeof(unsigned int) * (3 * num) * idx_num;
-
-				if(!(p = realloc(data->idx_buf, tmp)))
-					goto err_free_data;
-
-				data->idx_buf = p;
-			}
-
-			/* Read the indices in blocks of 3 with 5 each*/
-			for(j = 0; j < 3; j++) {
-				if(attr_m & AMO_M_RIG) {
-					tmp = (data->idx_c - 1) * (3 * num) + (j * num);
-					fscanf(fd, "%u/%u/%u/%u/%u",
-							&data->idx_buf[tmp + 0],
-							&data->idx_buf[tmp + 1],
-							&data->idx_buf[tmp + 2],
-							&data->idx_buf[tmp + 3],
-							&data->idx_buf[tmp + 4]);
-
-					/* OBJ-indices start counting at 1 */
-					data->idx_buf[tmp + 0] -= 1;
-					data->idx_buf[tmp + 1] -= 1;
-					data->idx_buf[tmp + 2] -= 1;
-					data->idx_buf[tmp + 3] -= 1;
-					data->idx_buf[tmp + 4] -= 1;
-				}
-				else {
-					tmp = ((data->idx_c - 1) * (3 * num)) + (j * num);
-					fscanf(fd, "%u/%u/%u",
-							&data->idx_buf[tmp + 0],
-							&data->idx_buf[tmp + 1],
-							&data->idx_buf[tmp + 2]);
-
-
-					/* OBJ-indices start counting at 1 */
-					data->idx_buf[tmp + 0] -= 1;
-					data->idx_buf[tmp + 1] -= 1;
-					data->idx_buf[tmp + 2] -= 1;
-
+			/* Read the indices in blocks of 3 with 5 each */
+			for(i = 0; i < data->idx_c; i++) {
+				for(j = 0; j < 3; j++) {
+					if(data->attr_m & AMO_M_RIG) {
+						tmp = (i * (3 * num)) + (j * num);
+						fscanf(fd, "%u %u %u %u %u",
+								&data->idx_buf[tmp + 0],
+								&data->idx_buf[tmp + 1],
+								&data->idx_buf[tmp + 2],
+								&data->idx_buf[tmp + 3],
+								&data->idx_buf[tmp + 4]);
+					}
+					else {
+						tmp = (i * (3 * num)) + (j * num);
+						fscanf(fd, "%u %u %u",
+								&data->idx_buf[tmp + 0],
+								&data->idx_buf[tmp + 1],
+								&data->idx_buf[tmp + 2]);
+					}
 				}
 			}
 		}
-		/* j <name> <parent> */
-		else if(strcmp(cmd_buf, "j") == 0) {
+		/* 
+		 * j <joint-num> 
+		 * <name> <parent> <matrix>
+		 */
+		else if(strcmp(opbuf, "j") == 0) {
 			int joint_par;
 			struct amo_joint *joint_tmp;
 
-			/* Increment the number of joints */
-			data->jnt_c++;
+			/* Read the number of joints */
+			fscanf(fd, "%d", &data->jnt_c);
 
-			/* Allocate memory if necessary */
-			if(data->jnt_c == 1) {
-				jnt_num = 200;
-				tmp = sizeof(struct amo_joint) * jnt_num;
+			/* Allocate memory */
+			tmp = sizeof(struct amo_joint) * data->jnt_c;
+			if(!(data->jnt_lst = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->jnt_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->jnt_c > jnt_num) {
-				jnt_num *= 1.5;
-				tmp = sizeof(struct amo_joint) * jnt_num;
-
-				if(!(p = realloc(data->jnt_lst, tmp)))
-					goto err_free_data;
-				data->jnt_lst = p;
-			}
-
-			/* Read the data of the new joint */
-			tmp = data->jnt_c - 1;
-			fscanf(fd, "%s %d",
-					data->jnt_lst[tmp].name,
+			/* Read the data of the joints */
+			for(i = 0; i < data->jnt_c; i++) {
+				fscanf(fd, "%s %d",
+					data->jnt_lst[i].name,
 					&joint_par);
 
-			/* Read the rest-bone-matrix */
-			for(i = 0; i < 16; i++)
-				fscanf(fd, "%f",
-						&data->jnt_lst[tmp].mat[i]);
+				/* Read the rest-bone-matrix */
+				for(j = 0; j < 16; j++)
+					fscanf(fd, "%f",
+							&data->jnt_lst[i].mat[j]);
 
-			/* Special treatment for root joint */
-			if(joint_par == -1) {
-				joint_tmp = NULL;
+				/* Set the index and parent-joint */
+				data->jnt_lst[i].index = i;
+				data->jnt_lst[i].par = joint_par;
 			}
-			else {
-				/* Correct the parent-index */
-				joint_par -= 1;
-
-				/* Get reference to parent-joint */
-				joint_tmp = &data->jnt_lst[joint_par];
-			}
-
-			/* TODO */
-			/* Set the parent-joint */
-			data->jnt_lst[tmp].index = tmp;
-			data->jnt_lst[tmp].par = joint_tmp;
 		}
-		/* a <name> */
-		else if(strcmp(cmd_buf, "a") == 0) {
-			/* Increment the number of animations */
-			data->ani_c++;
+		/* 
+		 * a <anim-num>
+		 * ...
+		 */
+		else if(strcmp(opbuf, "a") == 0) {
+			/* Read the number of animations */
+			fscanf(fd, "%d", &data->ani_c);
 
-			/* Allocate memory if necessary */
-			if(data->ani_c == 1) {
-				ani_num = 200;
-				tmp = sizeof(struct amo_anim ) * ani_num;
+			/* Allocate memory */
+			tmp = sizeof(struct amo_anim) * data->ani_c;
+			if(!(data->ani_lst = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->ani_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}	
-			else if(data->ani_c > ani_num) {
-				ani_num *= 1.5;
-				tmp = sizeof(struct amo_anim) * ani_num;
+			ani_itr = -1;
+		}
+		/*
+		 * an <name> <duration> <keyfr-num>
+		 * ...
+		 */
+		else if(strcmp(opbuf, "an") == 0) {
+			int tmp_num;
 
-				if(!(p = realloc(data->ani_lst, tmp)))
-					goto err_free_data;
+			/* Increment the animation-iterator */
+			ani_itr++;
 
-				data->ani_lst = p;
+			/* Read both the name and duration of the animation,
+			 * plus the number of keyframes */
+			fscanf(fd, "%s", data->ani_lst[ani_itr].name);
+			fscanf(fd, "%d", &data->ani_lst[ani_itr].dur);
+			fscanf(fd, "%d", &tmp_num);
+			data->ani_lst[ani_itr].keyfr_c = tmp_num;
+
+			/* Allocate memory for keyframes */
+			tmp = sizeof(struct amo_keyfr) * tmp_num;
+			if(!(data->ani_lst[ani_itr].keyfr_lst = malloc(tmp)))
+				goto err_free_data;
+
+			for(i = 0; i < tmp_num; i++) {
+				data->ani_lst[ani_itr].keyfr_lst[i].jnt = NULL;
+				data->ani_lst[ani_itr].keyfr_lst[i].pos = NULL;
+				data->ani_lst[ani_itr].keyfr_lst[i].rot = NULL;
 			}
 
-			/*  Set the number of keyframes to 0 */
-			data->ani_lst[data->ani_c - 1].keyfr_c = 0;
-
-			/* Read the data of the animation */
-			tmp = data->ani_c - 1;
-			fscanf(fd, "%s %d",
-					data->ani_lst[tmp].name,
-					&data->ani_lst[tmp].dur);
+			keyfr_itr = -1;
 		}
-		/* k <timestamp> */
-		else if(strcmp(cmd_buf, "k") == 0) {
-			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
-			short jnt_num;
-
-			ani->keyfr_c++;
-
-			/* Allocate memory if necessary */
-			if(ani->keyfr_c == 1) {
-				keyfr_num = 20;
-				tmp = sizeof(struct amo_keyfr) * keyfr_num;
-
-				if(!(ani->keyfr_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}	
-			else if(ani->keyfr_c > keyfr_num) {
-				keyfr_num *= 1.5;
-				tmp = sizeof(struct amo_keyfr) * keyfr_num;
-
-				if(!(p = realloc(ani->keyfr_lst, tmp)))
-					goto err_free_data;
-
-				ani->keyfr_lst = p;
-			}
-
-			/* Read the data of the keyframe */
-			tmp = ani->keyfr_c - 1;
-			fscanf(fd, "%f %d",
-					&ani->keyfr_lst[tmp].prog,
-					&ani->keyfr_lst[tmp].jnt_num);
-
-			jnt_num = ani->keyfr_lst[tmp].jnt_num;
-
-			/* Allocate memory for all bones in the keyframe */
-			tmp = jnt_num * sizeof(struct amo_joint *);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].joints = malloc(tmp)))
-				goto err_free_data;
-
-			tmp = jnt_num * sizeof(short);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].jnt = malloc(tmp)))
-				goto err_free_data;
-
-			for(i = 0; i < jnt_num; i++)
-				ani->keyfr_lst[ani->keyfr_c - 1].jnt[i] = -1;
-
-			tmp = jnt_num * 3 * sizeof(float);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].pos = malloc(tmp)))
-				goto err_free_data;
-
-			tmp = jnt_num * 4 * sizeof(float);
-			if(!(ani->keyfr_lst[ani->keyfr_c - 1].rot = malloc(tmp)))
-				goto err_free_data;
-		}
-		/* ap <joint> <x> <y> <z> */
-		else if(strcmp(cmd_buf, "ap") == 0) {
-			int joint;
-			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
+		/*
+		 * k <progress> <jnt-num>
+		 * <jnt-idx> <px> <py> <pz> <rw> <rx> <ry> <rz>
+		 */
+		else if(strcmp(opbuf, "k") == 0) {
+			struct amo_anim *ani;
 			struct amo_keyfr *keyfr;
-			int x;
-			int found = -1;
 
-			/* Get a pointer to the keyframe */
-			tmp = ani->keyfr_c - 1;
-			keyfr = &ani->keyfr_lst[tmp];
+			/* Increment the keyframe-iterator */
+			keyfr_itr++;
 
-			/* Read the data of the position-keyframe */
-			fscanf(fd, "%d",
-					&joint);
-		
-			/* Indices start at 1 */
-			joint -= 1;
 
-			/* Either search for the joint-slot or a free-slot */
-			for(x = 0; x < keyfr->jnt_num; x++) {
-				if(keyfr->jnt[x] == joint) {
-					found = x;
-					break;
-				}
-				if(keyfr->jnt[x] == -1) {
-					found = x;
+			/* Get a pointer to both the animation-struct and
+			 * keyframe-struct */
+			ani = &data->ani_lst[ani_itr];
 
-					/* Claim free slot for joint  */
-					keyfr->jnt[x] = joint;
+			keyfr = &ani->keyfr_lst[keyfr_itr];
 
-					break;
-				}
+			/* Read the progress and the joint-number */
+			fscanf(fd, "%f", &keyfr->prog);
+			fscanf(fd, "%d", &keyfr->jnt_num);
+
+			/* Allocate memory for data */	
+			tmp = keyfr->jnt_num * sizeof(short);
+			if(!(keyfr->jnt = malloc(tmp)))
+				goto err_free_data;	
+
+			tmp = keyfr->jnt_num * 3 * sizeof(float);
+			if(!(keyfr->pos = malloc(tmp)))
+				goto err_free_data;
+
+			tmp = keyfr->jnt_num * 4 * sizeof(float);
+			if(!(keyfr->rot = malloc(tmp)))
+				goto err_free_data;
+
+			/* Read the keyframe-joint-data */
+			for(i = 0; i < keyfr->jnt_num; i++) {
+				/* Read the joint-index */
+				fscanf(fd, "%hd", &keyfr->jnt[i]);
+
+				/* Read the position */
+				fscanf(fd, "%f %f %f",
+						&keyfr->pos[i * 3 + 0],
+						&keyfr->pos[i * 3 + 1],
+						&keyfr->pos[i * 3 + 2]);
+
+				/* Read the rotation */
+				fscanf(fd, "%f %f %f %f",
+						&keyfr->rot[i * 4 + 0],
+						&keyfr->rot[i * 4 + 1],
+						&keyfr->rot[i * 4 + 2],
+						&keyfr->rot[i * 4 + 3]);
 			}
-
-
-			/* Set a pointer to the referenced joint */
-			keyfr->joints[found] = &data->jnt_lst[joint];
-
-			/* Read the rest of the position-keyframe */
-			tmp = found * 3;
-			fscanf(fd, "%f %f %f",
-					&keyfr->pos[tmp + 0],
-					&keyfr->pos[tmp + 1],
-					&keyfr->pos[tmp + 2]);
 		}
-		/* ar <joint> <x> <y> <z> <w> */
-		else if(strcmp(cmd_buf, "ar") == 0) {
-			int joint;
-			struct amo_anim *ani = &data->ani_lst[data->ani_c - 1];
-			struct amo_keyfr *keyfr;
-			int x;
-			int found = -1;
+		/* 
+		 * hk <hook-num>
+		 * <idx> <par_jnt> <pos>
+		 */
+		else if(strcmp(opbuf, "hk") == 0) {
+			/* Read the number of hooks */
+			fscanf(fd, "%d", &data->hk_c);
 
-			/* Get a pointer to the keyframe */
-			tmp = ani->keyfr_c - 1;
-			keyfr = &ani->keyfr_lst[tmp];
+			/* Allocate memory */
+			tmp = sizeof(struct amo_hook) * data->hk_c;
+			if(!(data->hk_lst = malloc(tmp)))
+				goto err_free_data;
 
-			/* Read the data of the position-keyframe */
-			fscanf(fd, "%d",
-					&joint);
+			/* Read the data */
+			for(i = 0; i < data->hk_c; i++) {
+				/* Read the index */
+				fscanf(fd, "%hd",
+						&data->hk_lst[i].idx);
 
-			/* Indices start at 1 */
-			joint -= 1;
+				/* Read the parent-joint */
+				fscanf(fd, "%hd",
+						&data->hk_lst[i].par_jnt);
 
-			/* Either search for the joint-slot or a free-slot */
-			for(x = 0; x < keyfr->jnt_num; x++) {
-				if(keyfr->jnt[x] == joint) {
-					found = x;
-					break;
-				}
-				else if(keyfr->jnt[x] == -1) {
-					found = x;
 
-					/* Claim free slot for joint  */
-					keyfr->jnt[x] = joint;
+				/* Read the hook-position */
+				fscanf(fd, "%f %f %f",
+						&data->hk_lst[i].pos[0],
+						&data->hk_lst[i].pos[1],
+						&data->hk_lst[i].pos[2]);
 
-					break;
-				}
+				/* Read the forward-vector */
+				fscanf(fd, "%f %f %f",
+						&data->hk_lst[i].dir[0],
+						&data->hk_lst[i].dir[1],
+						&data->hk_lst[i].dir[2]);
+
+				/* Read the local matrix */
+				for(j = 0; j < 16; j++)
+					fscanf(fd, "%f",
+							&data->hk_lst[i].mat[j]);
 			}
-
-			/* Set a pointer to the referenced joint */
-			keyfr->joints[found] = &data->jnt_lst[joint];
-
-			/* Read the rest of the position-keyframe */
-			tmp = found * 4;
-			fscanf(fd, "%f %f %f %f",
-					&keyfr->rot[tmp + 0],
-					&keyfr->rot[tmp + 1],
-					&keyfr->rot[tmp + 2],
-					&keyfr->rot[tmp + 3]);
-		}
-		/* hh <idx> <par_jnt> <pos> */
-		else if(strcmp(cmd_buf, "hh") == 0) {
-			struct amo_hook *hook;
-
-			data->hh_c++;
-
-			/* Allocate memory if necessary */
-			if(data->hh_c == 1) {
-				hh_num = 20;
-
-				tmp = sizeof(struct amo_hook) * hh_num;
-				if(!(data->hh_lst = calloc(1, tmp)))
-					goto err_free_data;
-			}	
-			else if(data->hh_c > hh_num) {
-				hh_num *= 1.5;
-				tmp = sizeof(struct amo_hook) * hh_num;
-
-				if(!(p = realloc(data->hh_lst, tmp)))
-					goto err_free_data;
-
-				data->hh_lst = p;
-			}
-
-			hook = &data->hh_lst[data->hh_c - 1];
-
-			/* Read the hook-index */
-			fscanf(fd, "%hd",
-					&hook->idx);
-
-			hook->idx -= 1;
-
-			/* Read the parent-joint-index */
-			fscanf(fd, "%hd",
-					&hook->par_jnt);
-
-			hook->par_jnt -= 1;
-
-			/* Read the hook-position */
-			fscanf(fd, "%f %f %f",
-					&hook->pos[0],
-					&hook->pos[1],
-					&hook->pos[2]);
 		}
 		/* bp <x> <y> <z> <sx> <sy> <sz> */
-		else if(strcmp(cmd_buf, "bb") == 0) {
+		else if(strcmp(opbuf, "bb") == 0) {
 			fscanf(fd, "%f %f %f %f %f %f",
 					&data->bb_col.pos[0],
 					&data->bb_col.pos[1],
@@ -588,7 +405,7 @@ AMO_API struct amo_model *amo_load(FILE *fd)
 					&data->bb_col.scl[2]);
 		}
 		/* ne <x> <y> <z> <sx> <sy> <sz> */
-		else if(strcmp(cmd_buf, "ne") == 0) {
+		else if(strcmp(opbuf, "ne") == 0) {
 			/* Read the data of the near-elipsoid-buffer */
 			fscanf(fd, "%f %f %f %f %f %f",
 					&data->ne_col.pos[0],
@@ -598,265 +415,102 @@ AMO_API struct amo_model *amo_load(FILE *fd)
 					&data->ne_col.scl[1],
 					&data->ne_col.scl[2]);
 		}
-		/* cv <x> <y> <z> */
-		else if(strcmp(cmd_buf, "cv") == 0) {
-			/* Increment the number of vertices */
-			data->cm_vtx_c++;
+		/* 
+		 * cv <vertex-num>
+		 * <x> <y> <z>
+		 */
+		else if(strcmp(opbuf, "cv") == 0) {
+			/* Read the number of collision-mesh-vertices */
+			fscanf(fd, "%d", &data->cm_vtx_c);
 
-			/* Allocate memory if necessary */
-			if(data->cm_vtx_c == 1) {
-				cm_vtx_num = 200;
-				tmp = sizeof(float) * 3 * cm_vtx_num;
+			/* Allocate memory */
+			tmp = sizeof(float) * 3 * data->cm_vtx_c;
+			if(!(data->cm_vtx_buf = malloc(tmp)))
+				goto err_free_data;
 
-				if(!(data->cm_vtx_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->cm_vtx_c > cm_vtx_num) {
-				cm_vtx_num *= 1.5;
-				tmp = sizeof(float) * 3 * cm_vtx_num;
-
-				if(!(p = realloc(data->cm_vtx_buf, tmp)))
-					goto err_free_data;
-
-				data->cm_vtx_buf = p;
-			}
-
-			/* Read the data of the new vertex */
-			tmp = (data->cm_vtx_c - 1) * 3;
-			fscanf(fd, "%f %f %f",
+			/* Read the data of the vertices */
+			for(i = 0; i < data->cm_vtx_c; i++) {
+				tmp = i * 3;
+				fscanf(fd, "%f %f %f",
 					&data->cm_vtx_buf[tmp + 0],
 					&data->cm_vtx_buf[tmp + 1],
 					&data->cm_vtx_buf[tmp + 2]);
-		}
-		/* ci <v1> <v2> <v3> */
-		else if(strcmp(cmd_buf, "ci") == 0) {
-			/* Increment the number of index-blocks */
-			data->cm_idx_c++;
-
-			/* Allocate memory if necessary */
-			if(data->cm_idx_c == 1) {
-				cm_idx_num = 200;
-				tmp = sizeof(int) * 3 * cm_idx_num;
-
-				if(!(data->cm_idx_buf = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->cm_idx_c > cm_idx_num) {
-				cm_idx_num *= 1.5;
-				tmp = sizeof(int) * 3 * cm_idx_num;
-
-				if(!(p = realloc(data->cm_idx_buf, tmp)))
-					goto err_free_data;
-
-				data->cm_idx_buf = p;
-			}
-
-			/* Read the data of the new vertex */
-			tmp = (data->cm_idx_c - 1) * 3;
-			fscanf(fd, "%d %d %d",
-					&data->cm_idx_buf[tmp + 0],
-					&data->cm_idx_buf[tmp + 1],
-					&data->cm_idx_buf[tmp + 2]);
-
-			data->cm_idx_buf[tmp + 0] -= 1;
-			data->cm_idx_buf[tmp + 1] -= 1;
-			data->cm_idx_buf[tmp + 2] -= 1;
-		}
-		/* ci <jnt> <pos> <scl> <mat> */
-		else if(strcmp(cmd_buf, "rb") == 0) {
-			/* Increment the number of rig-boxes */
-			data->rb_c++;
-
-			/* Allocate memory if necessary */
-			if(data->rb_c == 1) {
-				rb_num = 20;
-
-				tmp = sizeof(int) * rb_num;
-				if(!(data->rb_jnt = calloc(1, tmp)))
-					goto err_free_data;
-
-				tmp = sizeof(float) * 3 * rb_num;
-				if(!(data->rb_pos = calloc(1, tmp)))
-					goto err_free_data;
-
-				tmp = sizeof(float) * 3 * rb_num;
-				if(!(data->rb_scl = calloc(1, tmp)))
-					goto err_free_data;
-
-				tmp = sizeof(float) * 16 * rb_num;
-				if(!(data->rb_mat = calloc(1, tmp)))
-					goto err_free_data;
-			}
-			else if(data->rb_c > rb_num) {
-				rb_num *= 1.5;
-
-				tmp = sizeof(int) * rb_num;
-				if(!(p = realloc(data->rb_jnt, tmp)))
-					goto err_free_data;
-				data->rb_jnt = p;
-
-				tmp = sizeof(float) * 3 * rb_num;
-				if(!(p = realloc(data->rb_pos, tmp)))
-					goto err_free_data;
-				data->rb_pos = p;
-
-				tmp = sizeof(float) * 3 * rb_num;
-				if(!(p = realloc(data->rb_scl, tmp)))
-					goto err_free_data;
-				data->rb_scl = p;
-
-				tmp = sizeof(float) * 16 * rb_num;
-				if(!(p = realloc(data->rb_mat, tmp)))
-					goto err_free_data;
-				data->rb_mat = p;
-			}
-
-			/* Read the parent-joint-index */
-			tmp = data->rb_c - 1;
-			fscanf(fd, "%d",
-					&data->rb_jnt[tmp]);
-
-			/* Indices start at one, so decerement by 1 */
-			data->rb_jnt[tmp] -= 1;
-
-			/* Read the position of the rig-box */
-			tmp = (data->rb_c - 1) * 3;
-			fscanf(fd, "%f %f %f",
-					&data->rb_pos[tmp + 0],
-					&data->rb_pos[tmp + 1],
-					&data->rb_pos[tmp + 2]);
-
-			/* Read the scale of the rig-box */
-			tmp = (data->rb_c - 1) * 3;
-			fscanf(fd, "%f %f %f",
-					&data->rb_scl[tmp + 0],
-					&data->rb_scl[tmp + 1],
-					&data->rb_scl[tmp + 2]);
-
-			/* Read the transformation-matrix of the box */
-			tmp = (data->rb_c - 1) * 16;
-			for(i = 0; i < 16; i++) {
-				fscanf(fd, "%f",
-						&data->rb_mat[tmp + i]);
 			}
 		}
-	}
+		/* 
+		 * ci <index-block-num> 
+		 * <v1> <v2> <v3>
+		 */
+		else if(strcmp(opbuf, "ci") == 0) {
+			/* Read the number of index-blocks */
+			fscanf(fd, "%d", &data->cm_idx_c);
 
-	/* 
-	 * Resize the arrays to make them fit their contents.
-	 */
-
-	/* vertex-buffer */
-	if(data->vtx_c > 0) {
-		tmp = data->vtx_c * 3 * sizeof(float);
-		if(!(p = realloc(data->vtx_buf, tmp)))
-			goto err_free_data;
-		data->vtx_buf = p;
-	}
-
-	/* texture-buffer */
-	if(data->tex_c > 0) {
-		tmp = data->tex_c * 2 * sizeof(float);
-		if(!(p = realloc(data->tex_buf, tmp)))
-			goto err_free_data;
-		data->tex_buf = p;
-	}
-
-	/* normal-buffer */
-	if(data->nrm_c > 0) {
-		tmp = data->nrm_c * 3 * sizeof(float);
-		if(!(p = realloc(data->nrm_buf, tmp)))
-			goto err_free_data;
-		data->nrm_buf = p;
-	}
-
-	/* vertex-joint-buffer */
-	if(data->vjnt_c > 0) {
-		tmp = data->vjnt_c * 4 * sizeof(int);
-		if(!(p = realloc(data->vjnt_buf, tmp)))
-			goto err_free_data;
-		data->vjnt_buf = p;
-	}
-
-	/* weight-buffer */
-	if(data->wgt_c > 0) {
-		tmp = data->wgt_c * 4 * sizeof(float);
-		if(!(p = realloc(data->wgt_buf, tmp)))
-			goto err_free_data;
-		data->wgt_buf = p;
-	}
-
-	/* index-buffer */
-	if(data->idx_c > 0) {
-		tmp = (attr_m & AMO_M_RIG) ? 5 : 3;
-		tmp = data->idx_c * 3 * tmp * sizeof(unsigned int);
-		if(!(p = realloc(data->idx_buf, tmp)))
-			goto err_free_data;
-		data->idx_buf = p;
-	}
-
-	/* joint-list */
-	if(data->jnt_c > 0) {
-		tmp = data->jnt_c * sizeof(struct amo_joint);
-		if(!(p = realloc(data->jnt_lst, tmp)))
-			goto err_free_data;
-		data->jnt_lst = p;
-	}
-
-	/* animation-list */
-	if(data->ani_c > 0) {
-		tmp = data->ani_c * sizeof(struct amo_anim);
-		if(!(p = realloc(data->ani_lst, tmp)))
-			goto err_free_data;
-		data->ani_lst = p;
-
-		for(i = 0; i < data->ani_c; i++) {
-			struct amo_anim *ani = &data->ani_lst[i];
-	
-			tmp = ani->keyfr_c * sizeof(struct amo_keyfr);
-			if(!(p = realloc(ani->keyfr_lst, tmp)))
+			/* Allocate memory */
+			tmp = sizeof(int) * 3 * data->cm_idx_c;
+			if(!(data->cm_idx_buf = malloc(tmp)))
 				goto err_free_data;
-			ani->keyfr_lst = p;
+
+			/* Read the data of the vertices */
+			for(i = 0; i < data->cm_idx_c; i++) {
+				tmp = i * 3;
+				fscanf(fd, "%d %d %d",
+						&data->cm_idx_buf[tmp + 0],
+						&data->cm_idx_buf[tmp + 1],
+						&data->cm_idx_buf[tmp + 2]);
+			}
 		}
-	}
+		/* 
+		 * rb <box-num>
+		 * <jnt> <pos> <scl> <mat>
+		 */
+		else if(strcmp(opbuf, "rb") == 0) {
+			/* Read the number of rig-boxes */
+			fscanf(fd, "%d", &data->rb_c);
 
-	/* collision-vertex-buffer */
-	if(data->cm_vtx_c > 0) {
-		tmp = data->cm_vtx_c * 3 * sizeof(float);
-		if(!(p = realloc(data->cm_vtx_buf, tmp)))
-			goto err_free_data;
-		data->cm_vtx_buf = p;
-	}
+			/* Allocate memory */	
+			tmp = sizeof(int) * data->rb_c;
+			if(!(data->rb_jnt = malloc(tmp)))
+				goto err_free_data;
 
-	/* collision-index-buffer */
-	if(data->cm_idx_c > 0) {
-		tmp = data->cm_idx_c * 3 * sizeof(int);
-		if(!(p = realloc(data->cm_idx_buf, tmp)))
-			goto err_free_data;
-		data->cm_idx_buf = p;
-	}
+			tmp = sizeof(float) * 3 * data->rb_c;
+			if(!(data->rb_pos = malloc(tmp)))
+				goto err_free_data;
 
-	/* collision-rig-boxes */
-	if(data->rb_c > 0) {
-		tmp = data->rb_c * sizeof(int);
-		if(!(p = realloc(data->rb_jnt, tmp)))
-			goto err_free_data;
-		data->rb_jnt = p;
+			tmp = sizeof(float) * 3 * data->rb_c;
+			if(!(data->rb_scl = malloc(tmp)))
+				goto err_free_data;
 
-		tmp = data->rb_c * 3 * sizeof(float);
-		if(!(p = realloc(data->rb_pos, tmp)))
-			goto err_free_data;
-		data->rb_pos = p;
+			tmp = sizeof(float) * 16 * data->rb_c;
+			if(!(data->rb_mat = malloc(tmp)))
+				goto err_free_data;
 
-		tmp = data->rb_c * 3 * sizeof(float);
-		if(!(p = realloc(data->rb_scl, tmp)))
-			goto err_free_data;
-		data->rb_scl = p;
+			for(i = 0; i < data->rb_c; i++) {
+				/* Read the parent-joint-index */
+				fscanf(fd, "%d",
+						&data->rb_jnt[i]);
 
-		tmp = data->rb_c * 16 * sizeof(float);
-		if(!(p = realloc(data->rb_mat, tmp)))
-			goto err_free_data;
-		data->rb_mat = p;
+				/* Read the position of the rig-box */
+				tmp = i * 3;
+				fscanf(fd, "%f %f %f",
+						&data->rb_pos[tmp + 0],
+						&data->rb_pos[tmp + 1],
+						&data->rb_pos[tmp + 2]);
+
+				/* Read the scale of the rig-box */
+				tmp = i * 3;
+				fscanf(fd, "%f %f %f",
+						&data->rb_scl[tmp + 0],
+						&data->rb_scl[tmp + 1],
+						&data->rb_scl[tmp + 2]);
+
+				/* Read the transformation-matrix of the box */
+				tmp = i * 16;
+				for(i = 0; i < 16; i++) {
+					fscanf(fd, "%f",
+							&data->rb_mat[tmp + i]);
+				}
+			}
+		}
 	}
 
 	/* Return the data */
@@ -876,45 +530,44 @@ AMO_API void amo_destroy(struct amo_model *data)
 {
 	int i;
 	int j;
+	struct amo_anim *ani;
+	struct amo_keyfr *keyfr;
 
 	/* If data is NULL, just skip destroying */
-	if(!data)
-		return;
+	if(!data) return;
 
-	free(data->vtx_buf);
-	free(data->tex_buf);
-	free(data->nrm_buf);
+	if(data->vtx_buf) free(data->vtx_buf);
+	if(data->tex_buf) free(data->tex_buf);
+	if(data->nrm_buf) free(data->nrm_buf);
 
-	if(data->jnt_c != 0) {
-		free(data->vjnt_buf);
-		free(data->wgt_buf);
-		free(data->jnt_lst);
+	if(data->vjnt_buf) free(data->vjnt_buf);
+	if(data->wgt_buf) free(data->wgt_buf);
+	if(data->jnt_lst) free(data->jnt_lst);
 
-		for(i = 0; i < data->ani_c; i++) {
-			for(j = 0; j < data->ani_lst[i].keyfr_c; j++) {
-				free(data->ani_lst[i].keyfr_lst[j].joints);
-				free(data->ani_lst[i].keyfr_lst[j].pos);
-				free(data->ani_lst[i].keyfr_lst[j].rot);
-			}
+	for(i = 0; i < data->ani_c; i++) {
+		ani = &data->ani_lst[i];
 
-			free(data->ani_lst[i].keyfr_lst);
+		for(j = 0; j < ani->keyfr_c; j++) {
+			keyfr = &ani->keyfr_lst[j];
+
+			if(keyfr->jnt) free(keyfr->jnt);
+			if(keyfr->pos) free(keyfr->pos);
+			if(keyfr->rot) free(keyfr->rot);
 		}
 
-		free(data->ani_lst);
+		if(ani->keyfr_lst) free(ani->keyfr_lst);
 	}
 
-	if(data->cm_vtx_c > 0) {
-		free(data->cm_vtx_buf);
-		free(data->cm_idx_buf);
-		free(data->cm_nrm_buf);
-	}
+	if(data->ani_lst) free(data->ani_lst);
 
-	if(data->rb_c > 0) {
-		free(data->rb_jnt);
-		free(data->rb_pos);
-		free(data->rb_scl);
-		free(data->rb_mat);
-	}
+	if(data->cm_vtx_buf) free(data->cm_vtx_buf);
+	if(data->cm_idx_buf) free(data->cm_idx_buf);
+	if(data->cm_nrm_buf) free(data->cm_nrm_buf);
+
+	if(data->rb_jnt) free(data->rb_jnt);
+	if(data->rb_pos) free(data->rb_pos);
+	if(data->rb_scl) free(data->rb_scl);
+	if(data->rb_mat) free(data->rb_mat);
 
 	free(data);
 }
